@@ -1,0 +1,11 @@
+# Config
+- rhythm: 10 days
+- start day: 2026-10-06
+
+# Schedule
+
+### Kitchen
+- Sink
+- Oven: inside (every 3. time)
+- Fridge (every 1. time from 2)
+- Window (inside) (every time)

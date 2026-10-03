@@ -1,0 +1,56 @@
+set_plan:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: cleaning_plan
+    plan:
+      required: true
+      selector:
+        text:
+          multiline: true
+
+set_task_done:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: cleaning_plan
+    floor:
+      selector:
+        text:
+    location:
+      required: true
+      selector:
+        text:
+    task:
+      required: true
+      selector:
+        text:
+    done:
+      default: true
+      selector:
+        boolean:
+    date:
+      selector:
+        date:
+
+get_visit:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: cleaning_plan
+    offset:
+      default: 0
+      selector:
+        number:
+          min: -100
+          max: 100
+          mode: box
+    date:
+      selector:
+        date:

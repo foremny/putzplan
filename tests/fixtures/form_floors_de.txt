@@ -1,0 +1,22 @@
+# Config
+- Rhythmus: 2 Wochen
+- Starttag: 6.10.2026
+
+# Schedule
+
+### Keller
+- Fegen
+
+## Erdgeschoss
+
+### Küche
+- Spüle
+
+### Bad
+- Toilette (alle 2. Mal)
+
+## Obergeschoss
+
+### Bad
+- Toilette
+- Dusche (alle 2. Mal ab 2)

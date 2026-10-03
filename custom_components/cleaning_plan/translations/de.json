@@ -1,0 +1,161 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Neuer Putzplan",
+        "description": "Den Plan selbst schreibst du im Dashboard, in der Putzplan-Karte.",
+        "data": {
+          "name": "Name"
+        },
+        "data_description": {
+          "name": "Wird als Gerätename und als Überschrift der Karte angezeigt."
+        }
+      }
+    },
+    "error": {
+      "name_required": "Bitte einen Namen eingeben."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "keep_days": "Häkchen aufbewahren für"
+        },
+        "data_description": {
+          "keep_days": "Häkchen von Besuchen, die länger zurückliegen, werden um Mitternacht gelöscht."
+        }
+      }
+    }
+  },
+  "entity": {
+    "calendar": {
+      "visits": {
+        "name": "Termine"
+      }
+    },
+    "sensor": {
+      "next_visit": {
+        "name": "Nächster Termin",
+        "state_attributes": {
+          "visit": {
+            "name": "Besuch"
+          },
+          "days_until": {
+            "name": "Tage bis dahin"
+          },
+          "tasks_due": {
+            "name": "Fällige Aufgaben"
+          }
+        }
+      },
+      "progress": {
+        "name": "Fortschritt",
+        "state_attributes": {
+          "visit": {
+            "name": "Besuch"
+          },
+          "date": {
+            "name": "Datum"
+          },
+          "ticked": {
+            "name": "Erledigt"
+          },
+          "open": {
+            "name": "Offen"
+          },
+          "total": {
+            "name": "Gesamt"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entry_not_found": {
+      "message": "Kein Putzplan mit der ID {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "Der Putzplan {title} ist nicht geladen."
+    },
+    "no_plan": {
+      "message": "Der Plan hat noch keinen gültigen Starttag."
+    },
+    "not_a_visit": {
+      "message": "{date} ist kein Termin dieses Plans."
+    },
+    "task_not_found": {
+      "message": "Der Plan hat keine Aufgabe „{task}“ in „{location}“."
+    },
+    "task_not_due": {
+      "message": "„{task}“ in „{location}“ ist am {date} nicht fällig."
+    },
+    "invalid_plan": {
+      "message": "Der Plan hat {count} Fehler. Erster: Zeile {line} ({code})."
+    }
+  },
+  "services": {
+    "set_plan": {
+      "name": "Plan setzen",
+      "description": "Ersetzt den Plantext. Wird abgelehnt, wenn der Text Fehler hat.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "Der zu ändernde Putzplan."
+        },
+        "plan": {
+          "name": "Plantext",
+          "description": "Der vollständige Plantext, im selben Format wie im Karten-Editor."
+        }
+      }
+    },
+    "set_task_done": {
+      "name": "Aufgabe abhaken",
+      "description": "Hakt eine Aufgabe eines Besuchs ab oder entfernt das Häkchen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "Der Putzplan."
+        },
+        "floor": {
+          "name": "Etage",
+          "description": "Etage genau wie im Plan. Leer lassen für Orte ohne Etage."
+        },
+        "location": {
+          "name": "Ort",
+          "description": "Name des Orts genau wie im Plan."
+        },
+        "task": {
+          "name": "Aufgabe",
+          "description": "Name der Aufgabe genau wie im Plan."
+        },
+        "done": {
+          "name": "Erledigt",
+          "description": "Wahr hakt ab, falsch entfernt das Häkchen."
+        },
+        "date": {
+          "name": "Termin",
+          "description": "Datum des Besuchs. Standard ist der aktuelle Besuch."
+        }
+      }
+    },
+    "get_visit": {
+      "name": "Besuch abfragen",
+      "description": "Liefert die fälligen Aufgaben eines Besuchs nach Ort gruppiert, mit Häkchen-Status.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "Der Putzplan."
+        },
+        "offset": {
+          "name": "Versatz",
+          "description": "0 ist der aktuelle Besuch, 1 der nächste, -1 der vorherige."
+        },
+        "date": {
+          "name": "Ab Datum",
+          "description": "Vom Besuch an oder nach diesem Datum zählen statt von heute."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "New cleaning plan",
+        "description": "You write the plan itself on the dashboard, in the cleaning plan card.",
+        "data": {
+          "name": "Name"
+        },
+        "data_description": {
+          "name": "Shown as the device name and in the card heading."
+        }
+      }
+    },
+    "error": {
+      "name_required": "Enter a name."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "keep_days": "Keep ticks for"
+        },
+        "data_description": {
+          "keep_days": "Ticks of visits older than this are deleted at midnight."
+        }
+      }
+    }
+  },
+  "entity": {
+    "calendar": {
+      "visits": {
+        "name": "Visits"
+      }
+    },
+    "sensor": {
+      "next_visit": {
+        "name": "Next visit",
+        "state_attributes": {
+          "visit": {
+            "name": "Visit"
+          },
+          "days_until": {
+            "name": "Days until"
+          },
+          "tasks_due": {
+            "name": "Tasks due"
+          }
+        }
+      },
+      "progress": {
+        "name": "Progress",
+        "state_attributes": {
+          "visit": {
+            "name": "Visit"
+          },
+          "date": {
+            "name": "Date"
+          },
+          "ticked": {
+            "name": "Done"
+          },
+          "open": {
+            "name": "Open"
+          },
+          "total": {
+            "name": "Total"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "entry_not_found": {
+      "message": "No cleaning plan with ID {entry_id}."
+    },
+    "entry_not_loaded": {
+      "message": "The cleaning plan {title} is not loaded."
+    },
+    "no_plan": {
+      "message": "The plan has no valid start day yet."
+    },
+    "not_a_visit": {
+      "message": "{date} is not a visit date of this plan."
+    },
+    "task_not_found": {
+      "message": "The plan has no task \"{task}\" in \"{location}\"."
+    },
+    "task_not_due": {
+      "message": "\"{task}\" in \"{location}\" is not due on {date}."
+    },
+    "invalid_plan": {
+      "message": "The plan has {count} error(s). First: line {line} ({code})."
+    }
+  },
+  "services": {
+    "set_plan": {
+      "name": "Set plan",
+      "description": "Replaces the plan text. Rejected if the text has errors.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "The cleaning plan to change."
+        },
+        "plan": {
+          "name": "Plan text",
+          "description": "The full plan text, in the same format as in the card editor."
+        }
+      }
+    },
+    "set_task_done": {
+      "name": "Set task done",
+      "description": "Ticks or unticks a task of a visit.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "The cleaning plan."
+        },
+        "floor": {
+          "name": "Floor",
+          "description": "Floor name exactly as in the plan. Leave empty for locations without a floor."
+        },
+        "location": {
+          "name": "Location",
+          "description": "Location name exactly as in the plan."
+        },
+        "task": {
+          "name": "Task",
+          "description": "Task name exactly as in the plan."
+        },
+        "done": {
+          "name": "Done",
+          "description": "True ticks the task, false unticks it."
+        },
+        "date": {
+          "name": "Visit date",
+          "description": "Date of the visit. Defaults to the current visit."
+        }
+      }
+    },
+    "get_visit": {
+      "name": "Get visit",
+      "description": "Returns the tasks due on a visit, grouped by location, with their tick state.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Plan",
+          "description": "The cleaning plan."
+        },
+        "offset": {
+          "name": "Offset",
+          "description": "0 is the current visit, 1 the one after, -1 the one before."
+        },
+        "date": {
+          "name": "From date",
+          "description": "Count from the visit on or after this date instead of today."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "entity": {
+    "calendar": {
+      "visits": { "default": "mdi:broom" }
+    },
+    "sensor": {
+      "next_visit": { "default": "mdi:calendar-star" },
+      "progress": { "default": "mdi:progress-check" }
+    }
+  },
+  "services": {
+    "set_plan": { "service": "mdi:clipboard-edit-outline" },
+    "set_task_done": { "service": "mdi:checkbox-marked-outline" },
+    "get_visit": { "service": "mdi:clipboard-list-outline" }
+  }
+}

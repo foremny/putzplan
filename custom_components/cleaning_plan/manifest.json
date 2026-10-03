@@ -1,0 +1,19 @@
+{
+  "domain": "cleaning_plan",
+  "name": "Cleaning plan",
+  "after_dependencies": [
+    "frontend"
+  ],
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [
+    "http",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/OWNER/putzliste",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/OWNER/putzliste/issues",
+  "requirements": [],
+  "version": "0.6.0"
+}
