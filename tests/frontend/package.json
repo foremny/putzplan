@@ -2,6 +2,12 @@
   "name": "cleaning-plan-card-tests",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test" },
-  "devDependencies": { "jsdom": "^26.0.0" }
+  "scripts": {
+    "test": "node --test",
+    "screenshots": "node screenshots.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "playwright-core": "^1.63.0"
+  }
 }

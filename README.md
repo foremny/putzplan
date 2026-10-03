@@ -4,6 +4,16 @@ A custom integration for a cleaner who comes on a fixed rhythm, for example ever
 
 The integration stores the plan and the ticks itself. It adds a calendar with one event per visit, sensors for the next visit and its progress, services for automations, and a Lovelace card that is loaded automatically.
 
+![Household view with floors, rooms and today's progress](docs/screenshots/household.png)
+
+| Cleaner's tablet | Schedule overview |
+| --- | --- |
+| ![Cleaner view without dates or editing](docs/screenshots/cleaner.png) | ![Overview of tasks that are not due on every visit](docs/screenshots/overview.png) |
+
+| Editing in the form | Editing as Markdown |
+| --- | --- |
+| ![Form editor with floors, rooms and task frequencies](docs/screenshots/editor-form.png) | ![Text editor with the Markdown plan](docs/screenshots/editor-text.png) |
+
 ## Installation
 
 **HACS.** Add this repository as a custom repository of type Integration, install "Cleaning plan", and restart Home Assistant.
@@ -188,6 +198,7 @@ Websocket commands used by the card:
 uv sync                                   # Python 3.13+, HA test harness, reportlab for the PDF
 uv run pytest                             # integration and parser tests
 cd tests/frontend && npm install && npm test   # card smoke tests in jsdom
+cd tests/frontend && npm run screenshots         # regenerate docs/screenshots with headless Chrome
 ```
 
 | Path | Purpose |
@@ -201,6 +212,7 @@ cd tests/frontend && npm install && npm test   # card smoke tests in jsdom
 Notes for changes:
 
 - Bump `version` in `manifest.json` and `CARD_VERSION` in the card together. A test checks they match.
+- The screenshots use the demo plan in `tests/fixtures/demo_plan.md`, parsed by the integration's own parser. Set `CHROME_PATH` if Chrome is not in the default macOS location.
 - `tests/fixtures/form_*.txt` is the exact text the form writes. The card tests compare against it and the Python tests parse it, which keeps the card's writer and the server's parser in step.
 - Home Assistant 2026.x validates with probatio instead of voluptuous. `util.py` imports whichever is available.
 - Parser error codes are translated in the card's `STRINGS`. A new code needs an entry there in every language.
