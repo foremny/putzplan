@@ -20,10 +20,12 @@
     "step": {
       "init": {
         "data": {
-          "keep_days": "Keep ticks for"
+          "keep_days": "Keep ticks for",
+          "supplies_todo": "Add missing supplies to"
         },
         "data_description": {
-          "keep_days": "Ticks of visits older than this are deleted at midnight."
+          "keep_days": "Ticks and problem reports of visits older than this are deleted at midnight.",
+          "supplies_todo": "Optional. When the cleaner reports a supply as missing, it is added to this to-do list, for example the shopping list. Clearing it in the card does not change the list."
         }
       }
     }
@@ -92,6 +94,12 @@
     },
     "invalid_plan": {
       "message": "The plan has {count} error(s). First: line {line} ({code})."
+    },
+    "supply_not_found": {
+      "message": "The plan has no supply \"{supply}\"."
+    },
+    "problem_not_found": {
+      "message": "This report no longer exists."
     }
   },
   "services": {

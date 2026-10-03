@@ -57,3 +57,10 @@
 - Aufräumen
 - Staub auf Trockner und Regalen (alle 2. Mal ab 2)
 - Flusensieb reinigen
+
+# Supplies
+- Müllbeutel
+- Spülmittel
+- Toilettenpapier
+- Glasreiniger
+- Staubsaugerbeutel

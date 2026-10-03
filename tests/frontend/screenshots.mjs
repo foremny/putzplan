@@ -42,6 +42,19 @@ const SNAPSHOT = {
   plan: parsed.plan,
   today: "2026-10-20",
   current_visit: 2,
+  missing: { Toilettenpapier: "2026-10-20T08:30:00+00:00" },
+  problems: [
+    {
+      id: "demo1",
+      date: "2026-10-20",
+      floor: "Erdgeschoss",
+      location: "Küche",
+      task: "Mülleimer sauber machen",
+      kind: "skipped",
+      note: "Keine Müllbeutel mehr da",
+      reported: "2026-10-20T09:10:00+00:00",
+    },
+  ],
   done: {
     "2026-10-06": [["Obergeschoss", "Schlafzimmer", "Unter der Matratze absaugen"]],
     "2026-10-20": [
@@ -144,6 +157,18 @@ await mount(page, { allow_edit: false });
 await click(page, '[data-act="fold"]', 2); // Gästebad
 await click(page, '[data-act="fold"]', 4); // OG Bad
 await shot(page, "cleaner", 820);
+
+// 2b. Cleaner reports a problem on a task
+await mount(page, { allow_edit: false });
+await click(page, '[data-act="fold"]', 2); // Gästebad
+await click(page, '.flag[data-task="Toilettenpapier auffüllen"]');
+await click(page, '[data-act="p-kind"][data-kind="issue"]');
+await page.evaluate(() => {
+  const input = document.querySelector("cleaning-plan-visit-card").shadowRoot.querySelector("[data-pnote]");
+  input.value = "Halter ist abgebrochen";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await shot(page, "cleaner-report", 820);
 
 // 3. Schedule overview
 await mount(page, {});

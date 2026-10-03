@@ -44,3 +44,15 @@ async def test_options(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {CONF_KEEP_DAYS: 30}
+
+
+async def test_options_supplies_todo(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """The to-do list for missing supplies can be set and cleared."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_KEEP_DAYS: 60, "supplies_todo": "todo.shopping_list"}
+    )
+    assert entry.options == {CONF_KEEP_DAYS: 60, "supplies_todo": "todo.shopping_list"}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {CONF_KEEP_DAYS: 60})
+    assert entry.options == {CONF_KEEP_DAYS: 60}

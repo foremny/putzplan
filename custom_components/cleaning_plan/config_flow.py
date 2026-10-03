@@ -13,6 +13,8 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -21,6 +23,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_KEEP_DAYS,
+    CONF_SUPPLIES_TODO,
     DEFAULT_KEEP_DAYS,
     DOMAIN,
 )
@@ -67,16 +70,18 @@ class CleaningPlanConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class CleaningPlanOptionsFlow(OptionsFlow):
-    """Change how long ticks are kept."""
+    """How long ticks are kept, and where missing supplies go."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Show the options form."""
         if user_input is not None:
-            return self.async_create_entry(
-                data={CONF_KEEP_DAYS: int(user_input[CONF_KEEP_DAYS])}
-            )
+            data: dict[str, Any] = {CONF_KEEP_DAYS: int(user_input[CONF_KEEP_DAYS])}
+            if todo := user_input.get(CONF_SUPPLIES_TODO):
+                data[CONF_SUPPLIES_TODO] = todo
+            return self.async_create_entry(data=data)
+        options = self.config_entry.options
         schema = vol.Schema(
             {
                 vol.Required(
@@ -91,6 +96,11 @@ class CleaningPlanOptionsFlow(OptionsFlow):
                         unit_of_measurement="d",
                     )
                 ),
+                # Optional and clearable, so a suggested value instead of a default
+                vol.Optional(
+                    CONF_SUPPLIES_TODO,
+                    description={"suggested_value": options.get(CONF_SUPPLIES_TODO)},
+                ): EntitySelector(EntitySelectorConfig(domain="todo")),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

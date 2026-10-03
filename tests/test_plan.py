@@ -317,3 +317,19 @@ def test_real_plan_file_parses() -> None:
     assert plan.errors == []
     assert len(plan.locations) == 14
     assert sum(len(loc.tasks) for loc in plan.locations) == 96
+
+
+def test_supplies() -> None:
+    """An optional supplies section lists what the cleaner can report as missing."""
+    plan = parse_plan(
+        "# Config\n- start: 2026-10-06\n# Schedule\n### Bad\n- a\n"
+        "# Vorräte\n- Müllbeutel\n- Spülmittel (Konzentrat)\n- Müllbeutel\n-\nText\n## X"
+    )
+    assert plan.supplies == ["Müllbeutel", "Spülmittel (Konzentrat)"]
+    assert plan.as_dict()["supplies"] == plan.supplies
+    assert [(e.code, e.line) for e in plan.errors] == [
+        ("supply_no_name", 10),
+        ("unexpected_line", 11),
+        ("outside_section", 12),
+    ]
+    assert parse_plan(EN).supplies == []

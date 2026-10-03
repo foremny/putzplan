@@ -19,7 +19,7 @@
  *   - Text: the raw plan text, validated on the server while typing.
  */
 
-const CARD_VERSION = "0.6.0";
+const CARD_VERSION = "0.7.0";
 const CARD_TYPE = "cleaning-plan-visit-card";
 const EDITOR_TYPE = "cleaning-plan-visit-card-editor";
 const WS = "cleaning_plan";
@@ -78,7 +78,8 @@ const STRINGS = {
       "Markdown: <code># Config</code> holds <code>- rhythm: 2 weeks</code> and <code>- start day: 6.10.2026</code>. " +
       "<code># Schedule</code> holds <code>## Floor</code> (optional), <code>### Room</code> and tasks as " +
       "<code>- Fridge (every 4. time from 2)</code>; without parentheses a task is due every time. " +
-      "<code>from 2</code> starts a task on the 2nd visit, so big jobs don't land on the same day. Comments: <code>&lt;!-- … --&gt;</code>.",
+      "<code>from 2</code> starts a task on the 2nd visit, so big jobs don't land on the same day. " +
+      "<code># Supplies</code> lists what the cleaner can report as missing. Comments: <code>&lt;!-- … --&gt;</code>.",
     loading: "Loading…",
     noPlans: "No cleaning plan yet. Add the Cleaning plan integration under Settings > Devices & services.",
     noPlan: "No plan yet. Select Edit plan to write one.",
@@ -98,6 +99,17 @@ const STRINGS = {
     backToCurrent: "Back to the current visit",
     doneOf: (a, b) => `${a} of ${b} done`,
     collapseAll: "Collapse all",
+    // feedback from the cleaner
+    suppliesLabel: "Running out?",
+    supplyMissing: "missing",
+    reportProblem: "Report a problem",
+    kinds: { skipped: "Couldn't do it", issue: "Problem" },
+    notePh: "What's wrong? (optional)",
+    send: "Send",
+    withdraw: "Withdraw",
+    feedbackTitle: (n) => `Feedback (${n})`,
+    resolve: "Done",
+    couldNotSend: "Could not send",
     expandAll: "Expand all",
     freqEvery: "every time",
     freqN: (n) => `every ${n}. time`,
@@ -110,6 +122,7 @@ const STRINGS = {
       task_no_name: "task has no name",
       freq_invalid: 'write the frequency as "(every time)" or "(every 2. time)", optionally "(every 2. time from 2)"',
       floor_no_name: 'the floor needs a name after "##"',
+      supply_no_name: "the supply has no name",
       room_no_name: 'the room needs a name after "###"',
       unknown_section: 'only "# Config" and "# Schedule" are allowed',
       unknown_setting: 'unknown setting; use "- rhythm: 2 weeks" or "- start day: 6.10.2026"',
@@ -142,6 +155,9 @@ const STRINGS = {
     everyNth: ". visit",
     from: "starting with visit",
     taskCount: (n) => (n === 1 ? "1 task" : `${n} tasks`),
+    suppliesTitle: "Supplies the cleaner can report as missing",
+    supplyPh: "e.g. Bin bags",
+    addSupply: "Add supply",
     moveUp: "Move up",
     moveDown: "Move down",
     remove: "Delete",
@@ -177,6 +193,7 @@ const STRINGS = {
       nameHash: (n) => `"${n}" can't end with " #".`,
       floorEmpty: "A floor with locations has no name. Only the first floor may stay unnamed.",
       floorDup: (n) => `There are two floors called "${n}".`,
+      supplyDup: (n) => `"${n}" is listed twice under supplies.`,
       locDup: (n) => `There are two locations called "${n}".`,
       taskDup: (loc, n) => `"${n}" appears twice in "${loc}".`,
       freq: (loc, n) => `"${n}" in "${loc}" needs whole numbers of at least 1.`,
@@ -200,6 +217,7 @@ const STRINGS = {
       "<code># Schedule</code> enthält <code>## Etage</code> (optional), <code>### Raum</code> und Aufgaben als " +
       "<code>- Kühlschrank (alle 4. Mal ab 2)</code>; ohne Klammer ist eine Aufgabe jedes Mal fällig. " +
       "Mit <code>ab 2</code> beginnt eine Aufgabe erst beim 2. Besuch, damit große Arbeiten nicht auf denselben Tag fallen. " +
+      "<code># Supplies</code> listet Material, das die Putzkraft als fehlend melden kann. " +
       "Kommentare: <code>&lt;!-- … --&gt;</code>.",
     loading: "Lädt…",
     noPlans: "Noch kein Putzplan. Die Integration „Cleaning plan“ unter Einstellungen > Geräte & Dienste hinzufügen.",
@@ -220,6 +238,16 @@ const STRINGS = {
     backToCurrent: "Zurück zum aktuellen Besuch",
     doneOf: (a, b) => `${a} von ${b} erledigt`,
     collapseAll: "Alle einklappen",
+    suppliesLabel: "Fehlt etwas?",
+    supplyMissing: "fehlt",
+    reportProblem: "Problem melden",
+    kinds: { skipped: "Nicht geschafft", issue: "Problem" },
+    notePh: "Was ist los? (optional)",
+    send: "Senden",
+    withdraw: "Zurückziehen",
+    feedbackTitle: (n) => `Rückmeldungen (${n})`,
+    resolve: "Erledigt",
+    couldNotSend: "Senden fehlgeschlagen",
     expandAll: "Alle ausklappen",
     freqEvery: "jedes Mal",
     freqN: (n) => `alle ${n}. Mal`,
@@ -232,6 +260,7 @@ const STRINGS = {
       task_no_name: "Aufgabe hat keinen Namen",
       freq_invalid: "Häufigkeit als „(jedes Mal)“ oder „(alle 2. Mal)“ schreiben, optional „(alle 2. Mal ab 2)“",
       floor_no_name: "Die Etage braucht einen Namen nach „##“",
+      supply_no_name: "Das Material hat keinen Namen",
       room_no_name: "Der Raum braucht einen Namen nach „###“",
       unknown_section: "Erlaubt sind nur „# Config“ und „# Schedule“",
       unknown_setting: "Unbekannte Einstellung; „- Rhythmus: 2 Wochen“ oder „- Starttag: 6.10.2026“ verwenden",
@@ -263,6 +292,9 @@ const STRINGS = {
     everyNth: ". Mal",
     from: "ab Besuch",
     taskCount: (n) => (n === 1 ? "1 Aufgabe" : `${n} Aufgaben`),
+    suppliesTitle: "Verbrauchsmaterial, das die Putzkraft als fehlend melden kann",
+    supplyPh: "z. B. Müllbeutel",
+    addSupply: "Material hinzufügen",
     moveUp: "Nach oben",
     moveDown: "Nach unten",
     remove: "Löschen",
@@ -297,6 +329,7 @@ const STRINGS = {
       nameHash: (n) => `„${n}“ darf nicht mit „ #“ enden.`,
       floorEmpty: "Eine Etage mit Orten hat keinen Namen. Nur die erste Etage darf ohne Namen bleiben.",
       floorDup: (n) => `Es gibt zwei Etagen namens „${n}“.`,
+      supplyDup: (n) => `„${n}“ steht zweimal beim Material.`,
       locDup: (n) => `Es gibt zwei Orte namens „${n}“.`,
       taskDup: (loc, n) => `„${n}“ steht zweimal in „${loc}“.`,
       freq: (loc, n) => `„${n}“ in „${loc}“ braucht ganze Zahlen ab 1.`,
@@ -394,6 +427,7 @@ function modelFromPlan(plan, today) {
     rhythmUnit: weeks ? "w" : "d",
     start: plan.start || today || "",
     floors,
+    supplies: (plan.supplies || []).map((name) => ({ id: newId(), name })),
   };
 }
 
@@ -450,6 +484,8 @@ function modelToText(m, lang) {
       for (const task of loc.tasks) lines.push(taskLine(task, de));
     }
   }
+  const supplies = (m.supplies || []).map((x) => x.name.trim()).filter(Boolean);
+  if (supplies.length) lines.push("", "# Supplies", ...supplies.map((x) => `- ${x}`));
   return lines.join("\n") + "\n";
 }
 
@@ -482,6 +518,12 @@ function validateModel(m, t) {
   const errs = [];
   if (!(Number.isInteger(m.rhythmN) && m.rhythmN >= 1)) errs.push({ msg: fe.rhythm, ref: { f: "rhythmN" } });
   if (!ISO_RE.test(m.start || "")) errs.push({ msg: fe.start, ref: { f: "start" } });
+  const supplyNames = new Set();
+  (m.supplies || []).forEach((x, si) => {
+    const name = x.name.trim();
+    if (name && supplyNames.has(name)) errs.push({ msg: fe.supplyDup(name), ref: { f: "supplyName", si } });
+    supplyNames.add(name);
+  });
   const floorNames = new Set();
   m.floors.forEach((floor, fi) => {
     const fname = floor.name.trim();
@@ -639,6 +681,10 @@ class CleaningPlanVisitCard extends HTMLElement {
         this._ed.dirty = true;
         this._validateTextSoon();
       } else if (e.target.dataset && e.target.dataset.f) this._onFormInput(e.target);
+      else if (e.target.dataset && "pnote" in e.target.dataset && this._pedit) {
+        this._pedit.note = e.target.value;
+        this._pedit.focus = true;
+      }
     };
     root.addEventListener("input", onInput);
     root.addEventListener("change", onInput);
@@ -897,6 +943,7 @@ class CleaningPlanVisitCard extends HTMLElement {
     else if (f === "rhythmUnit") m.rhythmUnit = el.value;
     else if (f === "start") m.start = el.value;
     else if (f === "floorName") this._floor(fi).name = el.value;
+    else if (f === "supplyName") m.supplies[Number(el.dataset.si)].name = el.value;
     else if (f === "locName") this._loc(fi, li).name = el.value;
     else if (f === "taskName") this._loc(fi, li).tasks[ti].name = el.value;
     else if (f === "every" || f === "from") {
@@ -925,6 +972,9 @@ class CleaningPlanVisitCard extends HTMLElement {
       loc.open = true;
       if (!loc.tasks.length) this._addTask(fi, li, 0);
       else this._render({ f: "taskName", fi, li, ti: 0 });
+    } else if (f === "supplyName") {
+      e.preventDefault();
+      this._addSupply(Number(e.target.dataset.si) + 1);
     } else if (f === "floorName") {
       e.preventDefault();
       const floor = this._floor(fi);
@@ -941,6 +991,14 @@ class CleaningPlanVisitCard extends HTMLElement {
     floor.open = true;
     floor.locations.push({ id: newId(), name: "", open: true, tasks: [] });
     this._ed.focus = { f: "locName", fi, li: floor.locations.length - 1 };
+  }
+
+  _addSupply(at) {
+    const list = this._ed.model.supplies;
+    const index = at == null ? list.length : at;
+    list.splice(index, 0, { id: newId(), name: "" });
+    this._ed.dirty = true;
+    this._render({ f: "supplyName", si: index });
   }
 
   _addTask(fi, li, at) {
@@ -997,7 +1055,9 @@ class CleaningPlanVisitCard extends HTMLElement {
       m.floors.push({ id: newId(), name: "", open: true, locations: [] });
       ed.dirty = true;
       return this._render({ f: "floorName", fi: m.floors.length - 1 });
-    } else if (act === "f-add-loc") {
+    } else if (act === "f-add-supply") return this._addSupply();
+    else if (act === "f-supply-del") m.supplies.splice(Number(el.dataset.si), 1);
+    else if (act === "f-add-loc") {
       this._addLocation(fi);
       ed.dirty = true;
       return this._render(ed.focus);
@@ -1060,7 +1120,12 @@ class CleaningPlanVisitCard extends HTMLElement {
     } else if (act === "ffold") {
       this._floorFold[el.dataset.key] = !this._floorFold[el.dataset.key];
       this._render();
-    }
+    } else if (act === "supply") this._toggleSupply(el);
+    else if (act === "flag") this._openProblem(el);
+    else if (act === "p-kind") ((this._pedit.kind = el.dataset.kind), (this._pedit.focus = false), this._render());
+    else if (act === "p-cancel") ((this._pedit = null), this._render());
+    else if (act === "p-send") this._sendProblem();
+    else if (act === "p-withdraw" || act === "p-resolve") this._resolveProblem(el.dataset.id);
   }
 
   /* ----- rendering ----- */
@@ -1073,7 +1138,15 @@ class CleaningPlanVisitCard extends HTMLElement {
         ? this._overviewView()
         : this._listView();
     this.shadowRoot.innerHTML = `<style>${STYLE}</style><ha-card>${body}</ha-card>`;
-    if (!this._editing) return;
+    if (!this._editing) {
+      // Keep typing in the problem note across re-renders (pushes from other devices)
+      const note = this._pedit && this._pedit.focus && this.shadowRoot.querySelector("[data-pnote]");
+      if (note) {
+        note.focus();
+        note.setSelectionRange(note.value.length, note.value.length);
+      }
+      return;
+    }
     this._renderEditMessages();
     if (this._ed.mode === "text" && !this._ed.serverErrors.length) this._validateTextSoon();
     const target = focus || this._ed.focus;
@@ -1401,6 +1474,19 @@ class CleaningPlanVisitCard extends HTMLElement {
         }
         ${content}
         <button class="add add-floor" data-act="f-add-floor">${PLUS}<span>${esc(t.addFloor)}</span></button>
+        <div class="fsupplies">
+          <div class="field">${esc(t.suppliesTitle)}</div>
+          ${m.supplies
+            .map(
+              (x, si) => `<div class="fsupply">
+                <input class="supply-input" data-f="supplyName" data-si="${si}" value="${esc(x.name)}"
+                       placeholder="${esc(t.supplyPh)}" enterkeyhint="next" autocomplete="off">
+                ${iconBtn("f-supply-del", DELETE, t.remove, `data-si="${si}"`, false)}
+              </div>`
+            )
+            .join("")}
+          <button class="add" data-act="f-add-supply">${PLUS}<span>${esc(t.addSupply)}</span></button>
+        </div>
       </div>`;
   }
 
@@ -1457,6 +1543,7 @@ class CleaningPlanVisitCard extends HTMLElement {
     const vDay = start + (visit - 1) * plan.rhythm;
     const iso = isoOf(vDay);
     const done = new Set((data.done[iso] || []).map(([f, l, k]) => `${f}|${l}|${k}`));
+    const problems = new Map((data.problems || []).map((p) => [`${p.date}|${p.floor}|${p.location}|${p.task}`, p]));
 
     let total = 0;
     let ticked = 0;
@@ -1485,15 +1572,25 @@ class CleaningPlanVisitCard extends HTMLElement {
       const rows = folded
         ? ""
         : keyed
-            .map(
-              ({ task, isDone }) => `<button class="task ${isDone ? "done" : ""}" data-act="toggle"
-                    data-date="${iso}" data-floor="${esc(floor)}" data-loc="${esc(loc.name)}" data-task="${esc(task.name)}"
-                    role="checkbox" aria-checked="${isDone}">
-              <span class="box">${CHECK}</span>
-              <span class="name">${esc(task.name)}</span>
-              ${c.allow_edit && task.every > 1 ? `<span class="freq">${esc(freqLabel(task, t))}</span>` : ""}
-            </button>`
-            )
+            .map(({ task, isDone }) => {
+              const ids = `data-date="${iso}" data-floor="${esc(floor)}" data-loc="${esc(loc.name)}" data-task="${esc(task.name)}"`;
+              const pkey = `${iso}|${floor}|${loc.name}|${task.name}`;
+              const problem = problems.get(pkey);
+              const editing = this._pedit && this._pedit.key === pkey;
+              return `<div class="task-row ${problem ? "has-problem" : ""}">
+                <button class="task ${isDone ? "done" : ""}" data-act="toggle" ${ids}
+                        role="checkbox" aria-checked="${isDone}">
+                  <span class="box">${CHECK}</span>
+                  <span class="name">${esc(task.name)}</span>
+                  ${c.allow_edit && task.every > 1 ? `<span class="freq">${esc(freqLabel(task, t))}</span>` : ""}
+                </button>
+                <button class="icon flag ${problem ? "on" : ""}" data-act="flag" ${ids}
+                        aria-label="${esc(t.reportProblem)}" title="${esc(t.reportProblem)}"
+                        aria-expanded="${!!editing}">${problem ? FLAG_ON : FLAG}</button>
+              </div>
+              ${problem && !editing ? `<div class="problem-note">${esc(t.kinds[problem.kind] || problem.kind)}${problem.note ? `: ${esc(problem.note)}` : ""}</div>` : ""}
+              ${editing ? this._problemEditorHTML() : ""}`;
+            })
             .join("");
       if (!floors.has(floor)) floors.set(floor, { sections: [], ticked: 0, total: 0 });
       const group = floors.get(floor);
@@ -1566,11 +1663,141 @@ class CleaningPlanVisitCard extends HTMLElement {
         }
         <span>${esc(doneOf)}</span>
       </div>
+      ${c.allow_edit ? this._feedbackHTML() : ""}
+      ${this._suppliesHTML()}
       ${this._error ? `<div class="msg err">${esc(this._error)}</div>` : ""}
       ${plan.errors.length ? `<div class="msg err">${esc(t.planProblems)}: ${plan.errors.map((e) => esc(errorText(e, t))).join("; ")}</div>` : ""}
       ${body || `<div class="msg">${esc(t.nothingDue)}</div>`}`;
   }
 }
+
+/* ---------- feedback from the cleaner: missing supplies, problems on tasks ---------- */
+
+Object.assign(CleaningPlanVisitCard.prototype, {
+  _suppliesHTML() {
+    const supplies = this._data.plan.supplies || [];
+    if (!supplies.length) return "";
+    const t = this._t;
+    const missing = this._data.missing || {};
+    return `<div class="supplies">
+        <span class="sup-label">${esc(t.suppliesLabel)}</span>
+        ${supplies
+          .map((name) => {
+            const on = name in missing;
+            return `<button class="chip sup ${on ? "missing" : ""}" data-act="supply" data-supply="${esc(name)}"
+                      aria-pressed="${on}" title="${on ? esc(t.supplyMissing) : ""}">${on ? ALERT : ""}${esc(name)}</button>`;
+          })
+          .join("")}
+      </div>`;
+  },
+
+  // Household view: all open problem reports, newest first
+  _feedbackHTML() {
+    const problems = this._data.problems || [];
+    if (!problems.length) return "";
+    const t = this._t;
+    const rows = problems
+      .map((p) => {
+        const where = p.floor ? `${p.floor} · ${p.location}` : p.location;
+        const date = formatDate(this._hass, isoToNum(p.date), { day: "numeric", month: "numeric" });
+        return `<div class="fb-row">
+            <span class="fb-kind kind-${esc(p.kind)}">${esc(t.kinds[p.kind] || p.kind)}</span>
+            <div class="fb-text">
+              <div><b>${esc(p.task)}</b> <span class="fb-where">${esc(where)} · ${esc(date)}</span></div>
+              ${p.note ? `<div class="fb-note">${esc(p.note)}</div>` : ""}
+            </div>
+            <button class="flat small" data-act="p-resolve" data-id="${esc(p.id)}">${esc(t.resolve)}</button>
+          </div>`;
+      })
+      .join("");
+    return `<div class="feedback"><div class="fb-title">${esc(t.feedbackTitle(problems.length))}</div>${rows}</div>`;
+  },
+
+  _problemEditorHTML() {
+    const t = this._t;
+    const pe = this._pedit;
+    const kind = (k) =>
+      `<button class="chip ${pe.kind === k ? "sel" : ""}" data-act="p-kind" data-kind="${k}" aria-pressed="${pe.kind === k}">${esc(t.kinds[k])}</button>`;
+    return `<div class="problem-edit">
+        <div class="kinds">${kind("skipped")}${kind("issue")}</div>
+        <input class="p-note" data-pnote value="${esc(pe.note)}" placeholder="${esc(t.notePh)}" maxlength="500" autocomplete="off">
+        <div class="p-actions">
+          ${pe.id ? `<button class="flat small" data-act="p-withdraw" data-id="${esc(pe.id)}">${esc(t.withdraw)}</button>` : ""}
+          <span class="spacer"></span>
+          <button class="flat" data-act="p-cancel">${esc(t.cancel)}</button>
+          <button class="primary" data-act="p-send" ${pe.kind ? "" : "disabled"}>${esc(t.send)}</button>
+        </div>
+      </div>`;
+  },
+
+  _openProblem(el) {
+    const { date, floor, loc, task } = el.dataset;
+    const key = `${date}|${floor}|${loc}|${task}`;
+    if (this._pedit && this._pedit.key === key) {
+      this._pedit = null;
+    } else {
+      const existing = (this._data.problems || []).find(
+        (p) => p.date === date && p.floor === floor && p.location === loc && p.task === task
+      );
+      this._pedit = {
+        key, date, floor, loc, task,
+        id: existing ? existing.id : null,
+        kind: existing ? existing.kind : null,
+        note: existing ? existing.note : "",
+        focus: false,
+      };
+    }
+    this._render();
+  },
+
+  async _sendProblem() {
+    const pe = this._pedit;
+    if (!pe || !pe.kind) return;
+    try {
+      await this._hass.callWS({
+        type: `${WS}/report_problem`,
+        entry_id: this._entryId,
+        date: pe.date,
+        floor: pe.floor,
+        location: pe.loc,
+        task: pe.task,
+        kind: pe.kind,
+        note: pe.note.trim(),
+      });
+      this._pedit = null;
+      this._error = null;
+    } catch (err) {
+      this._error = `${this._t.couldNotSend}: ${errMsg(err)}`;
+    }
+    this._render();
+  },
+
+  async _resolveProblem(id) {
+    try {
+      await this._hass.callWS({ type: `${WS}/resolve_problem`, entry_id: this._entryId, problem_id: id });
+      if (this._pedit && this._pedit.id === id) this._pedit = null;
+      this._error = null;
+    } catch (err) {
+      this._error = `${this._t.couldNotSend}: ${errMsg(err)}`;
+    }
+    this._render();
+  },
+
+  async _toggleSupply(el) {
+    const supply = el.dataset.supply;
+    const missing = el.getAttribute("aria-pressed") !== "true";
+    // Optimistic, the subscription push confirms it
+    el.classList.toggle("missing", missing);
+    el.setAttribute("aria-pressed", String(missing));
+    try {
+      await this._hass.callWS({ type: `${WS}/set_supply_missing`, entry_id: this._entryId, supply, missing });
+      this._error = null;
+    } catch (err) {
+      this._error = `${this._t.couldNotSend}: ${errMsg(err)}`;
+    }
+    this._render();
+  },
+});
 
 /* ---------- visual card editor (dashboard edit mode) ---------- */
 
@@ -1620,6 +1847,9 @@ const CHEV_D = svg("M7.4 8.6 6 10l6 6 6-6-1.4-1.4L12 13.2z", 22);
 const ARROW_UP = svg("M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z", 20);
 const ARROW_DOWN = svg("M11 4h2v12l5.5-5.5 1.42 1.42L12 19.84l-7.92-7.92L5.5 10.5 11 16z", 20);
 const DELETE = svg("M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM8 9h8v10H8zm7.5-5-1-1h-5l-1 1H5v2h14V4z", 20);
+const FLAG = svg("M12.36 6l.4 2H18v6h-3.36l-.4-2H7V6h5.36M14 4H5v17h2v-7h5.6l.4 2h7V6h-5.6z", 20);
+const FLAG_ON = svg("M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z", 20);
+const ALERT = svg("M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2z", 16);
 const PLUS = svg("M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z", 20);
 
 const STYLE = `
@@ -1675,6 +1905,39 @@ const STYLE = `
           border: 1px solid var(--divider-color); border-radius: 10px; padding: 1px 8px; }
 
   .head-btns { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+  /* feedback: supplies, problems */
+  .chip { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px; border-radius: 18px;
+          border: 1px solid var(--divider-color); font-size: 0.9rem; color: var(--primary-text-color); }
+  .chip:hover { background: var(--secondary-background-color); }
+  .chip.sel { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .supplies { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 14px; }
+  .sup-label { font-size: 0.85rem; font-weight: 500; color: var(--secondary-text-color); margin-right: 4px; }
+  .chip.sup.missing { background: var(--warning-color, #ffa600); border-color: var(--warning-color, #ffa600); color: #fff; font-weight: 500; }
+  .task-row { display: flex; align-items: center; }
+  .task-row .task { flex: 1; min-width: 0; }
+  .icon.flag { width: 40px; height: 40px; color: var(--secondary-text-color); opacity: 0.55; }
+  .icon.flag:hover { opacity: 1; }
+  .icon.flag.on { color: var(--warning-color, #ffa600); opacity: 1; }
+  .problem-note { margin: -6px 44px 6px 40px; font-size: 0.8rem; color: var(--warning-color, #ffa600); font-weight: 500; }
+  .problem-edit { margin: 0 0 10px 40px; padding: 10px; border-radius: 10px; background: var(--secondary-background-color);
+                  display: flex; flex-direction: column; gap: 8px; }
+  .problem-edit .kinds { display: flex; gap: 8px; flex-wrap: wrap; }
+  .problem-edit .p-note { font: inherit; color: var(--primary-text-color); background: var(--card-background-color);
+                          border: 1px solid var(--divider-color); border-radius: 6px; padding: 8px; min-height: 40px; }
+  .p-actions { display: flex; align-items: center; gap: 8px; }
+  .feedback { border: 1px solid var(--warning-color, #ffa600); border-radius: 10px; padding: 6px 10px; margin: 8px 0 12px; }
+  .fb-title { font-weight: 600; font-size: 0.9rem; color: var(--primary-text-color); padding: 4px 0; }
+  .fb-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--divider-color); }
+  .fb-kind { flex: none; font-size: 0.75rem; font-weight: 600; border-radius: 10px; padding: 2px 8px; margin-top: 2px;
+             background: var(--warning-color, #ffa600); color: #fff; }
+  .fb-kind.kind-skipped { background: var(--secondary-text-color); }
+  .fb-text { flex: 1; min-width: 0; font-size: 0.9rem; color: var(--primary-text-color); }
+  .fb-where { color: var(--secondary-text-color); font-size: 0.8rem; }
+  .fb-note { color: var(--secondary-text-color); font-size: 0.85rem; }
+  .fsupplies { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .fsupply { display: flex; align-items: center; gap: 6px; }
+  .fsupply .supply-input { flex: 1; min-width: 0; max-width: 420px; }
 
   /* floors in the tick-off list */
   .floor { margin: 4px 0 8px; }

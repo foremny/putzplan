@@ -5,6 +5,9 @@ cleaning_plan/subscribe  -> pushes a snapshot now and on every change
 cleaning_plan/validate   -> {errors, plan} for plan text, without saving
 cleaning_plan/save_plan  -> {saved, errors}; optional renames keep ticks
 cleaning_plan/set_done   -> ticks or unticks one task of one visit
+cleaning_plan/set_supply_missing -> reports a supply as missing / available
+cleaning_plan/report_problem     -> reports a problem with a task of a visit
+cleaning_plan/resolve_problem    -> removes a problem report
 """
 
 from __future__ import annotations
@@ -13,9 +16,10 @@ from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, NOTE_MAX_LENGTH, PROBLEM_KINDS
 from .manager import InvalidPlan
 from .plan import parse_plan
 from .util import get_manager, resolve_tick, vol
@@ -29,6 +33,9 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_validate)
     websocket_api.async_register_command(hass, ws_save_plan)
     websocket_api.async_register_command(hass, ws_set_done)
+    websocket_api.async_register_command(hass, ws_set_supply_missing)
+    websocket_api.async_register_command(hass, ws_report_problem)
+    websocket_api.async_register_command(hass, ws_resolve_problem)
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/plans"})
@@ -144,4 +151,70 @@ async def ws_set_done(
     floor, location, task = msg["floor"], msg["location"], msg["task"]
     day = resolve_tick(manager, msg["date"], floor, location, task)
     await manager.async_set_done(day, floor, location, task, msg["done"])
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/set_supply_missing",
+        vol.Required("entry_id"): cv.string,
+        vol.Required("supply"): str,
+        vol.Required("missing"): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_set_supply_missing(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Report a supply from the plan as missing, or as available again."""
+    _, manager = get_manager(hass, msg["entry_id"])
+    if msg["supply"] not in manager.plan.supplies:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="supply_not_found",
+            translation_placeholders={"supply": msg["supply"]},
+        )
+    await manager.async_set_supply_missing(msg["supply"], msg["missing"])
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/report_problem",
+        vol.Required("entry_id"): cv.string,
+        vol.Required("date"): cv.date,
+        vol.Optional("floor", default=""): str,
+        vol.Required("location"): str,
+        vol.Required("task"): str,
+        vol.Required("kind"): vol.In(PROBLEM_KINDS),
+        vol.Optional("note", default=""): vol.All(str, vol.Length(max=NOTE_MAX_LENGTH)),
+    }
+)
+@websocket_api.async_response
+async def ws_report_problem(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Report that a task of a visit could not be done or has a problem."""
+    _, manager = get_manager(hass, msg["entry_id"])
+    floor, location, task = msg["floor"], msg["location"], msg["task"]
+    day = resolve_tick(manager, msg["date"], floor, location, task)
+    problem = await manager.async_report_problem(day, floor, location, task, msg["kind"], msg["note"])
+    connection.send_result(msg["id"], {"id": problem["id"]})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/resolve_problem",
+        vol.Required("entry_id"): cv.string,
+        vol.Required("problem_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_resolve_problem(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Remove a problem report (fixed, or withdrawn by the cleaner)."""
+    _, manager = get_manager(hass, msg["entry_id"])
+    if not await manager.async_resolve_problem(msg["problem_id"]):
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="problem_not_found")
     connection.send_result(msg["id"])

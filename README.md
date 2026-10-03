@@ -2,13 +2,17 @@
 
 A custom integration for a cleaner who comes on a fixed rhythm, for example every 2 weeks. The household writes the plan in a dashboard card, in a form or as Markdown. On cleaning day the cleaner sees the tasks due on that visit, grouped by location, and ticks them off.
 
-The integration stores the plan and the ticks itself. It adds a calendar with one event per visit, sensors for the next visit and its progress, services for automations, and a Lovelace card that is loaded automatically.
+The cleaner can report missing supplies and problems with a task. The integration stores the plan, the ticks and this feedback itself. It adds a calendar with one event per visit, sensors for the next visit and its progress, services for automations, and a Lovelace card that is loaded automatically.
 
 ![Household view with floors, rooms and today's progress](docs/screenshots/household.png)
 
-| Cleaner's tablet | Schedule overview |
+| Cleaner's tablet | Cleaner reports a problem |
 | --- | --- |
-| ![Cleaner view without dates or editing](docs/screenshots/cleaner.png) | ![Overview of tasks that are not due on every visit](docs/screenshots/overview.png) |
+| ![Cleaner view without dates or editing](docs/screenshots/cleaner.png) | ![Problem report form on a task](docs/screenshots/cleaner-report.png) |
+
+| Schedule overview | Overview tab in the editor |
+| --- | --- |
+| ![Overview of tasks that are not due on every visit](docs/screenshots/overview.png) | ![Overview tab with tap-to-move](docs/screenshots/editor-overview.png) |
 
 | Editing in the form | Editing as Markdown |
 | --- | --- |
@@ -52,6 +56,13 @@ How the card behaves:
 - **Language and dates** follow the user's Home Assistant profile. German and English are built in, other languages fall back to English.
 - **Live updates.** Ticks from another device appear immediately. The card gets pushed updates instead of polling.
 - **Editor.** "Edit plan" opens the editor with three tabs: Form, Overview and Text. All three show the same plan.
+
+### Feedback from the cleaner
+
+- **Missing supplies.** Supplies from the plan's `# Supplies` section show as chips under "Fehlt etwas?" in both views. One tap marks a supply as missing, shown in orange. Another tap clears it, for example once it's bought. A missing supply can also be added to a to-do list automatically, see [Options](#options).
+- **Problems on a task.** Each task has a flag button. The cleaner chooses "Nicht geschafft" or "Problem", adds an optional note and sends it. The flag turns orange and the note shows under the task. Tapping the flag again opens the report to change it or withdraw it.
+- **Household view.** A "Rückmeldungen" box above the list shows all open problem reports, also from earlier visits, newest first. "Erledigt" removes a report.
+- **Notifications.** Every report fires an event, see [Events](#events).
 
 ### Schedule overview
 
@@ -100,6 +111,10 @@ The plan is Markdown. The form in the card writes it for you, so you only need t
 
 ### Bad
 - Toilette, Waschbecken, Dusche
+
+# Supplies
+- Müllbeutel
+- Toilettenpapier
 ```
 
 | Line | Meaning |
@@ -113,6 +128,7 @@ The plan is Markdown. The form in the card writes it for you, so you only need t
 | `- name` | A task due on every visit. `*` and `+` also work as bullets |
 | `- name (alle N. Mal)` / `(every N. time)` | Due on visits 1, 1+N, 1+2N, … |
 | `- name (alle N. Mal ab S)` / `(every N. time from S)` | Due on visits S, S+N, S+2N, … Use this to spread heavy tasks across visits |
+| `# Supplies` | Optional. List items are supplies the cleaner can report as missing. `# Vorräte` and `# Material` also work |
 | `<!-- … -->` | Comment, also over several lines |
 
 English and German keywords can be mixed. Only a trailing parenthesis that is a frequency counts. In "Fenster (innen)" the parenthesis stays part of the name, and colons in names are fine.
@@ -171,13 +187,45 @@ actions:
         {% endfor %}
 ```
 
+## Events
+
+`cleaning_plan_feedback` is fired when the cleaner reports something and when it is cleared. `data.type` says what happened:
+
+| `type` | Further data |
+| --- | --- |
+| `supply_missing`, `supply_available` | `supply` |
+| `task_problem` | `id`, `date`, `floor`, `location`, `task`, `kind` (`skipped` or `issue`), `note` |
+| `problem_resolved` | `id`, `date`, `floor`, `location`, `task` |
+
+All events also carry `entry_id`. Example: a push notification for every report.
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: cleaning_plan_feedback
+    event_data:
+      type: task_problem
+actions:
+  - action: notify.notify
+    data:
+      title: "Putzen: {{ trigger.event.data.task }}"
+      message: >
+        {{ 'Nicht geschafft' if trigger.event.data.kind == 'skipped' else 'Problem' }}
+        in {{ trigger.event.data.location }}: {{ trigger.event.data.note or '-' }}
+```
+
 ## Options
 
-Settings > Devices & services > Cleaning plan > Configure sets how many days ticks are kept. The default is 60. Older ticks are deleted at midnight.
+Settings > Devices & services > Cleaning plan > Configure:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| Keep ticks for | 60 days | Ticks and problem reports of older visits are deleted at midnight. Missing supplies don't expire |
+| Add missing supplies to | none | A to-do list, for example the shopping list. A supply the cleaner reports as missing is added there, unless an open item with the same name exists. Clearing it in the card doesn't change the list |
 
 ## How it works
 
-- **Storage.** `.storage/cleaning_plan.<entry_id>` holds the plan text and, per visit date, the ticked `[floor, location, task]` entries. Floor is `""` for locations without a floor.
+- **Storage.** `.storage/cleaning_plan.<entry_id>` holds the plan text and, per visit date, the ticked `[floor, location, task]` entries. Floor is `""` for locations without a floor. It also holds the missing supplies and the open problem reports. Problem reports follow renamed tasks like ticks do.
 - **Ticks are keyed by names.** Renaming a task or location, or changing the start day or rhythm, un-ticks it for the current visit.
 - **No carry-over.** A task that isn't ticked off reappears at its next regular turn.
 - **Permissions.** Any logged-in user can tick and edit. `allow_edit: false` only hides the editor in that card.
@@ -191,6 +239,9 @@ Websocket commands used by the card:
 | `cleaning_plan/validate` | Parsed plan and errors for a plan text, as `{code, line}` pairs, without saving |
 | `cleaning_plan/save_plan` | Save if valid. Optional `renames`, as `[{from: [floor, location, task], to: [floor, location, task]}]`, move ticks. Returns `{saved, errors}` |
 | `cleaning_plan/set_done` | Tick or untick one task of one visit. `floor` defaults to `""` |
+| `cleaning_plan/set_supply_missing` | Report a supply from the plan as missing or available |
+| `cleaning_plan/report_problem` | Report `skipped` or `issue` with an optional note, up to 500 characters, for a task due on that visit. Replaces an earlier report for the same task and visit |
+| `cleaning_plan/resolve_problem` | Remove a problem report by `problem_id` |
 
 ## Development
 

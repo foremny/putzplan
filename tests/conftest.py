@@ -23,6 +23,10 @@ PLAN = """# Config
 
 ### Bad
 - Toilette
+
+# Supplies
+- Müllbeutel
+- Spülmittel
 """
 
 

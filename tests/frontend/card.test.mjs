@@ -641,3 +641,120 @@ test("a plan in the old format explains the new one and opens in the text tab", 
   assert.equal($("#plan-text").value, old.text);
   assert.match($("#errors").textContent, /alten Format/);
 });
+
+/* ---------- feedback: supplies and problems ---------- */
+
+const FEEDBACK = {
+  ...SNAPSHOT,
+  plan: { ...SNAPSHOT.plan, supplies: ["Müllbeutel", "Spülmittel"] },
+  missing: { Spülmittel: "2026-10-06T08:00:00+00:00" },
+  problems: [
+    {
+      id: "p1",
+      date: "2026-10-06",
+      floor: "",
+      location: "Bad",
+      task: "Toilette",
+      kind: "issue",
+      note: "Spülung defekt",
+      reported: "2026-10-06T09:00:00+00:00",
+    },
+  ],
+};
+
+test("supply chips show what is missing and toggle it", async () => {
+  for (const config of [{}, { allow_edit: false }]) {
+    const { $, $$, calls } = await household(FEEDBACK, config);
+    assert.match($(".sup-label").textContent, /Fehlt etwas\?/);
+    const chips = $$(".chip.sup");
+    assert.deepEqual(chips.map((c) => c.textContent.trim()), ["Müllbeutel", "Spülmittel"]);
+    assert.ok(chips[1].classList.contains("missing"));
+    chips[0].click();
+    await tick();
+    assert.deepEqual(plain(calls.filter((c) => c.type === "cleaning_plan/set_supply_missing").pop()), {
+      type: "cleaning_plan/set_supply_missing",
+      entry_id: "e1",
+      supply: "Müllbeutel",
+      missing: true,
+    });
+    $$(".chip.sup")[1].click();
+    await tick();
+    assert.equal(calls.filter((c) => c.type === "cleaning_plan/set_supply_missing").pop().missing, false);
+  }
+  const { $ } = await household(SNAPSHOT);
+  assert.equal($(".supplies"), null, "no chips without supplies in the plan");
+});
+
+test("cleaner flags a task: pick a kind, add a note, send", async () => {
+  const { window, card, $, $$, calls, subs } = await household(FEEDBACK, { allow_edit: false });
+  assert.equal($(".feedback"), null, "no feedback list in the cleaner view");
+  $('[data-act="fold"]').click(); // Küche
+  const flag = $('.flag[data-task="Spüle"]');
+  flag.click();
+  assert.ok($(".problem-edit"));
+  assert.equal($('[data-act="p-send"]').disabled, true, "a kind must be chosen first");
+  $('[data-act="p-kind"][data-kind="skipped"]').click();
+  const note = $("[data-pnote]");
+  note.value = "Kein Spülmittel mehr";
+  note.dispatchEvent(new window.Event("input", { bubbles: true }));
+  // A push from another device while typing keeps the note and the focus
+  subs[0].cb({ ...FEEDBACK });
+  assert.equal($("[data-pnote]").value, "Kein Spülmittel mehr");
+  assert.equal(root(card).activeElement, $("[data-pnote]"));
+  $('[data-act="p-send"]').click();
+  await tick();
+  assert.deepEqual(plain(calls.filter((c) => c.type === "cleaning_plan/report_problem").pop()), {
+    type: "cleaning_plan/report_problem",
+    entry_id: "e1",
+    date: "2026-10-06",
+    floor: "",
+    location: "Küche",
+    task: "Spüle",
+    kind: "skipped",
+    note: "Kein Spülmittel mehr",
+  });
+  assert.equal($(".problem-edit"), null, "editor closes after sending");
+  assert.equal($$(".problem-note").length, 0, "Küche has no report yet");
+});
+
+test("a reported task shows its note; the cleaner can withdraw it", async () => {
+  const { $, $$, calls } = await household(FEEDBACK, { allow_edit: false });
+  $$('[data-act="fold"]')[1].click(); // Bad
+  assert.ok($(".task-row.has-problem"));
+  assert.equal($(".flag.on").dataset.task, "Toilette");
+  assert.match($(".problem-note").textContent, /Problem: Spülung defekt/);
+  $(".flag.on").click();
+  assert.equal($("[data-pnote]").value, "Spülung defekt", "editor opens with the report");
+  assert.ok($('[data-act="p-kind"][data-kind="issue"]').classList.contains("sel"));
+  $('[data-act="p-withdraw"]').click();
+  await tick();
+  assert.deepEqual(plain(calls.filter((c) => c.type === "cleaning_plan/resolve_problem").pop()), {
+    type: "cleaning_plan/resolve_problem",
+    entry_id: "e1",
+    problem_id: "p1",
+  });
+});
+
+test("household view lists open feedback with a done button", async () => {
+  const { $, $$, calls } = await household(FEEDBACK);
+  assert.match($(".fb-title").textContent, /Rückmeldungen \(1\)/);
+  assert.match($(".fb-row").textContent.replace(/\s+/g, " "), /Problem Toilette Bad · 6\.10\. Spülung defekt/);
+  $('[data-act="p-resolve"]').click();
+  await tick();
+  assert.equal(calls.filter((c) => c.type === "cleaning_plan/resolve_problem").pop().problem_id, "p1");
+});
+
+test("form edits the supplies list", async () => {
+  const { card, $, type, enter, save } = await editor(FEEDBACK);
+  const inputs = () => [...root(card).querySelectorAll('[data-f="supplyName"]')];
+  assert.deepEqual(inputs().map((i) => i.value), ["Müllbeutel", "Spülmittel"]);
+  enter(inputs()[1]);
+  assert.equal(root(card).activeElement, inputs()[2], "Enter adds the next supply");
+  type(inputs()[2], "Müllbeutel");
+  assert.match($("#errors").textContent, /„Müllbeutel“ steht zweimal beim Material/);
+  type(inputs()[2], "Toilettenpapier");
+  $('[data-act="f-supply-del"][data-si="0"]').click();
+  $('[data-act="f-add-supply"]').click(); // empty ones are dropped
+  const call = await save();
+  assert.match(call.text, /\n\n# Supplies\n- Spülmittel\n- Toilettenpapier\n$/);
+});

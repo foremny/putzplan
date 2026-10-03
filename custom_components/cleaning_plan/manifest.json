@@ -2,7 +2,8 @@
   "domain": "cleaning_plan",
   "name": "Cleaning plan",
   "after_dependencies": [
-    "frontend"
+    "frontend",
+    "todo"
   ],
   "codeowners": [],
   "config_flow": true,
@@ -15,5 +16,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/OWNER/putzliste/issues",
   "requirements": [],
-  "version": "0.6.0"
+  "version": "0.7.0"
 }

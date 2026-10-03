@@ -8,11 +8,12 @@ from typing import Any
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
+    async_capture_events,
     async_fire_time_changed,
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
@@ -397,3 +398,166 @@ async def test_storage_migrates_from_version_1(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.runtime_data.is_done(dt.date(2026, 10, 6), "", "Bad", "Toilette")
+
+
+# ----- feedback: missing supplies and problem reports -----
+
+
+async def test_supplies_missing_and_event(
+    hass: HomeAssistant, loaded: MockConfigEntry, hass_ws_client: WebSocketGenerator
+) -> None:
+    """Supplies from the plan can be reported missing and available again."""
+    events = async_capture_events(hass, "cleaning_plan_feedback")
+    client = await hass_ws_client(hass)
+    manager = loaded.runtime_data
+    assert manager.plan.supplies == ["Müllbeutel", "Spülmittel"]
+
+    await client.send_json_auto_id(
+        {"type": "cleaning_plan/set_supply_missing", "entry_id": loaded.entry_id, "supply": "Müllbeutel", "missing": True}
+    )
+    assert (await client.receive_json())["success"]
+    assert manager.is_missing("Müllbeutel")
+    assert list(manager.snapshot("x")["missing"]) == ["Müllbeutel"]
+    await hass.async_block_till_done()
+    assert [e.data for e in events] == [
+        {"entry_id": loaded.entry_id, "type": "supply_missing", "supply": "Müllbeutel"}
+    ]
+
+    # Reporting again changes nothing and fires nothing
+    await manager.async_set_supply_missing("Müllbeutel", True)
+    await hass.async_block_till_done()
+    assert len(events) == 1
+
+    await client.send_json_auto_id(
+        {"type": "cleaning_plan/set_supply_missing", "entry_id": loaded.entry_id, "supply": "Gold", "missing": True}
+    )
+    msg = await client.receive_json()
+    assert msg["error"]["translation_key"] == "supply_not_found"
+
+    # A supply removed from the plan is no longer missing
+    await manager.async_set_supply_missing("Spülmittel", True)
+    await manager.async_set_plan(PLAN.replace("- Müllbeutel\n", ""))
+    assert manager.snapshot("x")["missing"].keys() == {"Spülmittel"}
+    assert not manager.is_missing("Müllbeutel")
+
+    await manager.async_set_supply_missing("Spülmittel", False)
+    await hass.async_block_till_done()
+    assert events[-1].data["type"] == "supply_available"
+
+
+async def test_missing_supply_goes_to_todo_list(
+    hass: HomeAssistant, loaded: MockConfigEntry
+) -> None:
+    """With the option set, a missing supply is added to the to-do list once."""
+    items: list[dict[str, Any]] = [{"summary": "Milch", "uid": "1", "status": "needs_action"}]
+    added: list[str] = []
+    hass.states.async_set("todo.shopping_list", "1")
+
+    async def get_items(call: ServiceCall) -> dict[str, Any]:
+        return {"todo.shopping_list": {"items": items}}
+
+    async def add_item(call: ServiceCall) -> None:
+        added.append(call.data["item"])
+        items.append({"summary": call.data["item"], "uid": str(len(items) + 1), "status": "needs_action"})
+
+    hass.services.async_register("todo", "get_items", get_items, supports_response=SupportsResponse.ONLY)
+    hass.services.async_register("todo", "add_item", add_item)
+
+    hass.config_entries.async_update_entry(loaded, options={"keep_days": 60, "supplies_todo": "todo.shopping_list"})
+    await hass.async_block_till_done()
+    manager = loaded.runtime_data
+    assert manager.supplies_todo == "todo.shopping_list"
+
+    await manager.async_set_supply_missing("Müllbeutel", True)
+    assert added == ["Müllbeutel"]
+    # Cleared and reported again while still open on the list: not added twice
+    await manager.async_set_supply_missing("Müllbeutel", False)
+    await manager.async_set_supply_missing("Müllbeutel", True)
+    assert added == ["Müllbeutel"]
+
+
+async def test_missing_todo_list_only_logs(
+    hass: HomeAssistant, loaded: MockConfigEntry, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A to-do list that does not exist does not break reporting."""
+    loaded.runtime_data.supplies_todo = "todo.gone"
+    await loaded.runtime_data.async_set_supply_missing("Müllbeutel", True)
+    assert loaded.runtime_data.is_missing("Müllbeutel")
+    assert "todo.gone" in caplog.text
+
+
+async def test_problem_report_and_resolve(
+    hass: HomeAssistant, loaded: MockConfigEntry, hass_ws_client: WebSocketGenerator
+) -> None:
+    """The cleaner reports a problem on a due task; the household resolves it."""
+    events = async_capture_events(hass, "cleaning_plan_feedback")
+    client = await hass_ws_client(hass)
+    manager = loaded.runtime_data
+    base = {"type": "cleaning_plan/report_problem", "entry_id": loaded.entry_id, "date": "2026-10-06"}
+
+    await client.send_json_auto_id({**base, "location": "Bad", "task": "Toilette", "kind": "issue", "note": " Spülung defekt "})
+    first = (await client.receive_json())["result"]["id"]
+    [problem] = manager.snapshot("x")["problems"]
+    assert problem["id"] == first
+    assert (problem["floor"], problem["location"], problem["task"]) == ("", "Bad", "Toilette")
+    assert (problem["kind"], problem["note"], problem["date"]) == ("issue", "Spülung defekt", "2026-10-06")
+    await hass.async_block_till_done()
+    assert events[-1].data == {
+        "entry_id": loaded.entry_id,
+        "type": "task_problem",
+        "id": first,
+        "date": "2026-10-06",
+        "floor": "",
+        "location": "Bad",
+        "task": "Toilette",
+        "kind": "issue",
+        "note": "Spülung defekt",
+    }
+
+    # A second report for the same task and visit replaces the first
+    await client.send_json_auto_id({**base, "location": "Bad", "task": "Toilette", "kind": "skipped"})
+    second = (await client.receive_json())["result"]["id"]
+    assert [p["id"] for p in manager.snapshot("x")["problems"]] == [second]
+
+    # Only due tasks, only known kinds
+    await client.send_json_auto_id({**base, "location": "Küche", "task": "Kühlschrank", "kind": "issue"})
+    assert (await client.receive_json())["error"]["translation_key"] == "task_not_due"
+    await client.send_json_auto_id({**base, "location": "Bad", "task": "Toilette", "kind": "kaputt"})
+    assert (await client.receive_json())["error"]["code"] == "invalid_format"
+    await client.send_json_auto_id({**base, "location": "Bad", "task": "Toilette", "kind": "issue", "note": "x" * 501})
+    assert (await client.receive_json())["error"]["code"] == "invalid_format"
+
+    await client.send_json_auto_id({"type": "cleaning_plan/resolve_problem", "entry_id": loaded.entry_id, "problem_id": second})
+    assert (await client.receive_json())["success"]
+    assert manager.snapshot("x")["problems"] == []
+    await hass.async_block_till_done()
+    assert events[-1].data["type"] == "problem_resolved"
+
+    await client.send_json_auto_id({"type": "cleaning_plan/resolve_problem", "entry_id": loaded.entry_id, "problem_id": second})
+    assert (await client.receive_json())["error"]["translation_key"] == "problem_not_found"
+
+
+async def test_problems_follow_renames_and_expire(
+    hass: HomeAssistant, loaded: MockConfigEntry, berlin: FrozenDateTimeFactory
+) -> None:
+    """Problem reports move with renamed tasks and expire with keep_days."""
+    manager = loaded.runtime_data
+    await manager.async_report_problem(dt.date(2026, 10, 6), "", "Bad", "Toilette", "issue", "")
+    await manager.async_set_plan(
+        PLAN.replace("### Bad\n- Toilette", "### Bad\n- WC"),
+        [(("", "Bad", "Toilette"), ("", "Bad", "WC"))],
+    )
+    assert manager.snapshot("x")["problems"][0]["task"] == "WC"
+
+    # Survives a reload
+    assert await hass.config_entries.async_reload(loaded.entry_id)
+    await hass.async_block_till_done()
+    manager = loaded.runtime_data
+    assert len(manager.snapshot("x")["problems"]) == 1
+
+    hass.config_entries.async_update_entry(loaded, options={"keep_days": 10})
+    await hass.async_block_till_done()
+    berlin.move_to("2026-10-20 22:00:06+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert manager.snapshot("x")["problems"] == []

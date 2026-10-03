@@ -10,11 +10,18 @@ DOMAIN: Final = "cleaning_plan"
 STORAGE_VERSION: Final = 2
 
 CONF_KEEP_DAYS: Final = "keep_days"
+CONF_SUPPLIES_TODO: Final = "supplies_todo"
 DEFAULT_KEEP_DAYS: Final = 60
 
 # Frontend card shipped with the integration
 CARD_FILENAME: Final = "cleaning-plan-card.js"
 CARD_URL_BASE: Final = f"/{DOMAIN}_static"
+
+# Fired when the cleaner reports a missing supply or a problem with a task,
+# and when either is cleared. data: entry_id, type and the details.
+EVENT_FEEDBACK: Final = "cleaning_plan_feedback"
+PROBLEM_KINDS: Final = ("skipped", "issue")
+NOTE_MAX_LENGTH: Final = 500
 
 # Service and websocket field names
 ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"

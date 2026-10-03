@@ -15,6 +15,9 @@ The plan is Markdown. English and German keywords are both accepted:
     - Kühlschrank (alle 4. Mal ab 2)        - Fridge (every 4. time from 2)
     <!-- comment -->
 
+    # Supplies                              optional; the cleaner reports
+    - Müllbeutel                            what is running out
+
 Rooms before the first floor heading have no floor (floor ""). A tick is
 keyed by (floor, room, task), so "Bad" on two floors are separate.
 Only a trailing "(...)" that is a frequency counts; "Fenster (innen)" is a
@@ -51,12 +54,14 @@ ERR_TASK_OUTSIDE_ROOM = "task_outside_room"
 ERR_HEADING_LEVEL = "heading_level"
 ERR_UNEXPECTED_LINE = "unexpected_line"
 ERR_OLD_FORMAT = "old_format"
+ERR_SUPPLY_NO_NAME = "supply_no_name"
 
 # Floor of rooms that come before any floor heading
 NO_FLOOR = ""
 
 _SECTION_CONFIG = {"config", "configuration", "settings", "einstellungen", "konfiguration"}
 _SECTION_SCHEDULE = {"schedule", "plan", "putzplan", "zeitplan", "aufgaben", "tasks"}
+_SECTION_SUPPLIES = {"supplies", "vorräte", "vorrat", "material", "verbrauchsmaterial", "putzmittel"}
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 # ATX heading; an optional closing run of # after a space is dropped
@@ -119,6 +124,8 @@ class Plan:
     rhythm: int = DEFAULT_RHYTHM_DAYS
     start: dt.date | None = None
     locations: list[Location] = field(default_factory=list)
+    # Things the cleaner can report as missing, in plan order, without duplicates
+    supplies: list[str] = field(default_factory=list)
     errors: list[PlanError] = field(default_factory=list)
 
     @property
@@ -200,6 +207,7 @@ class Plan:
                 }
                 for loc in self.locations
             ],
+            "supplies": list(self.supplies),
             "errors": [e.as_dict() for e in self.errors],
         }
 
@@ -303,6 +311,7 @@ def parse_plan(text: str | None) -> Plan:
                 section = (
                     "config" if key in _SECTION_CONFIG
                     else "schedule" if key in _SECTION_SCHEDULE
+                    else "supplies" if key in _SECTION_SUPPLIES
                     else None
                 )
                 if section is None:
@@ -346,6 +355,14 @@ def parse_plan(text: str | None) -> Plan:
                 plan.errors.append(PlanError(ERR_TASK_OUTSIDE_ROOM, ln))
             else:
                 room.tasks.append(Task(name, *freq))
+        elif section == "supplies":
+            name = (bullet[1] or "").strip() if bullet else None
+            if name is None:
+                plan.errors.append(PlanError(ERR_UNEXPECTED_LINE, ln))
+            elif not name:
+                plan.errors.append(PlanError(ERR_SUPPLY_NO_NAME, ln))
+            elif name not in plan.supplies:
+                plan.supplies.append(name)
         else:
             plan.errors.append(PlanError(ERR_OUTSIDE_SECTION, ln))
 

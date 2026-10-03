@@ -20,10 +20,12 @@
     "step": {
       "init": {
         "data": {
-          "keep_days": "Häkchen aufbewahren für"
+          "keep_days": "Häkchen aufbewahren für",
+          "supplies_todo": "Fehlendes Material eintragen in"
         },
         "data_description": {
-          "keep_days": "Häkchen von Besuchen, die länger zurückliegen, werden um Mitternacht gelöscht."
+          "keep_days": "Häkchen und Rückmeldungen von Besuchen, die länger zurückliegen, werden um Mitternacht gelöscht.",
+          "supplies_todo": "Optional. Meldet die Putzkraft fehlendes Material, wird es in diese To-do-Liste eingetragen, zum Beispiel die Einkaufsliste. Zurücksetzen in der Karte ändert die Liste nicht."
         }
       }
     }
@@ -92,6 +94,12 @@
     },
     "invalid_plan": {
       "message": "Der Plan hat {count} Fehler. Erster: Zeile {line} ({code})."
+    },
+    "supply_not_found": {
+      "message": "Der Plan hat kein Verbrauchsmaterial „{supply}“."
+    },
+    "problem_not_found": {
+      "message": "Diese Rückmeldung gibt es nicht mehr."
     }
   },
   "services": {

@@ -28,6 +28,7 @@ from .const import (
     CARD_FILENAME,
     CARD_URL_BASE,
     CONF_KEEP_DAYS,
+    CONF_SUPPLIES_TODO,
     DEFAULT_KEEP_DAYS,
     DOMAIN,
 )
@@ -74,7 +75,10 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 async def async_setup_entry(hass: HomeAssistant, entry: CleaningPlanConfigEntry) -> bool:
     """Set up one cleaning plan."""
     manager = CleaningPlanManager(
-        hass, entry.entry_id, entry.options.get(CONF_KEEP_DAYS, DEFAULT_KEEP_DAYS)
+        hass,
+        entry.entry_id,
+        entry.options.get(CONF_KEEP_DAYS, DEFAULT_KEEP_DAYS),
+        entry.options.get(CONF_SUPPLIES_TODO),
     )
     await manager.async_load()
     await manager.async_cleanup()
@@ -99,6 +103,7 @@ async def _async_options_updated(
     """Apply changed options without a reload."""
     manager = entry.runtime_data
     manager.keep_days = entry.options.get(CONF_KEEP_DAYS, DEFAULT_KEEP_DAYS)
+    manager.supplies_todo = entry.options.get(CONF_SUPPLIES_TODO)
     await manager.async_cleanup()
     manager.async_notify()
 
