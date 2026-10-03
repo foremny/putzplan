@@ -50,8 +50,8 @@ The card also has a visual editor. Find it as "Cleaning plan" in the card picker
 
 How the card behaves:
 
-- **Floors.** With floors in the plan, each floor gets a header with its done count, and its locations are listed below it. A floor folds by itself when all its tasks are done, and a tap on the header opens or closes it.
-- **Locations start folded.** Each header shows its name and how many tasks are ticked. Tap to open. A location folds again when its last task is ticked. "Collapse all" / "Expand all" sits above the list.
+- **Floors.** With floors in the plan, each floor gets a header with its done count, and its rooms are listed below it. A floor folds by itself when all its tasks are done, and a tap on the header opens or closes it.
+- **Opens fully folded.** On first use, floors and rooms are all folded. Each header shows how many tasks are ticked, and a tap opens it. What you open or close is remembered per plan in this browser, so the cleaner's tablet and your phone each keep their own state, also across visits and reloads. A room folds again when its last task is ticked. "Collapse all" / "Expand all" sits above the list and includes floors.
 - **Width.** In a sections view the card asks for the full row width. In a masonry view, use a panel view for a wide card.
 - **Language and dates** follow the user's Home Assistant profile. German and English are built in, other languages fall back to English.
 - **Live updates.** Ticks from another device appear immediately. The card gets pushed updates instead of polling.
@@ -71,7 +71,7 @@ In the household view, "Overview" next to "Edit plan" opens a table of the tasks
 - **Columns** are visits, with visit number and date. The current visit is highlighted and past visits are dimmed. The table shows at least one full repeat cycle of the plan, between 8 and 16 visits. The arrows page through further visits.
 - **Rows** are the irregular tasks, grouped by floor and location, with their frequency. A dot marks each visit where a task is due, and a green check marks a visit where it was done.
 - **Load rows.** "Extra tasks" counts the irregular tasks per visit, shaded darker on heavy visits. "All tasks" counts everything due. Use them to see whether big jobs pile up on the same visit.
-- **Moving a task in the editor.** In the editor tab the table follows unsaved changes. Tapping an empty cell moves that task's turn to this visit, keeping its interval. The change is saved with "Save plan".
+- **Planning in the editor.** In the editor's Overview tab the table follows unsaved changes. Tapping an empty cell moves that task's turn to this visit, keeping its interval. The − and + buttons next to a task's frequency change its interval, keeping its start visit. A task you change there stays in the table until you leave the editor, even if you set it to every time. Changes are saved with "Save plan".
 
 The cleaner view has no overview.
 

@@ -130,6 +130,12 @@ const click = (page, selector, index = 0) =>
     { selector, index }
   );
 
+// The list opens fully folded; open the ground and upper floor
+const openFloors = async (page) => {
+  await click(page, '[data-act="ffold"]', 0);
+  await click(page, '[data-act="ffold"]', 1);
+};
+
 async function shot(page, name, width) {
   await page.setViewportSize({ width, height: 900 });
   await page.waitForTimeout(400); // transitions and debounced validation
@@ -147,6 +153,7 @@ console.log(`Writing to ${OUT}`);
 // 1. Household view: floors, some rooms opened
 await mount(page, {});
 await page.setViewportSize({ width: 1200, height: 900 });
+await openFloors(page);
 await click(page, '[data-act="fold"]', 0); // Küche
 await click(page, '[data-act="fold"]', 2); // Gästebad
 await click(page, '[data-act="fold"]', 4); // OG Bad
@@ -154,12 +161,14 @@ await shot(page, "household", 1200);
 
 // 2. Cleaner view on a tablet: no dates, no editing
 await mount(page, { allow_edit: false });
+await openFloors(page);
 await click(page, '[data-act="fold"]', 2); // Gästebad
 await click(page, '[data-act="fold"]', 4); // OG Bad
 await shot(page, "cleaner", 820);
 
 // 2b. Cleaner reports a problem on a task
 await mount(page, { allow_edit: false });
+await openFloors(page);
 await click(page, '[data-act="fold"]', 2); // Gästebad
 await click(page, '.flag[data-task="Toilettenpapier auffüllen"]');
 await click(page, '[data-act="p-kind"][data-kind="issue"]');

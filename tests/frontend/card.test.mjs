@@ -29,8 +29,8 @@ const SNAPSHOT = {
 const plain = (o) => JSON.parse(JSON.stringify(o));
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-function setup(language = "de") {
-  const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only" });
+function setup(language = "de", url = undefined) {
+  const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", ...(url ? { url } : {}) });
   const { window } = dom;
   window.eval(readFileSync(CARD, "utf8"));
   const calls = [];
@@ -528,11 +528,12 @@ test("tick-off list groups locations under floors and keeps same-named locations
   const { card, $, $$, calls } = await household(FLOORS);
   assert.deepEqual($$(".floor-name").map((n) => n.textContent), ["Erdgeschoss", "Obergeschoss"]);
   assert.deepEqual($$(".floor-head .loc-count").map((n) => n.textContent), ["0/2", "1/1"]);
-  assert.ok($$(".floor")[1].classList.contains("folded"), "a finished floor folds by itself");
+  assert.ok($$(".floor").every((f) => f.classList.contains("folded")), "floors start folded");
   assert.match(text(card), /Keller 0\/1/, "locations without a floor come first, without a header");
+  $$(".floor-head")[0].click(); // open the ground floor
   assert.match(text(card), /Bad 0\/1/, "ground floor bathroom is not ticked");
 
-  $$(".floor-head")[1].click(); // reopen the upper floor
+  $$(".floor-head")[1].click(); // open the upper floor
   const og = $$(".floor")[1];
   assert.ok(!og.classList.contains("folded"));
   og.querySelector('[data-act="fold"]').click();
@@ -757,4 +758,90 @@ test("form edits the supplies list", async () => {
   $('[data-act="f-add-supply"]').click(); // empty ones are dropped
   const call = await save();
   assert.match(call.text, /\n\n# Supplies\n- Spülmittel\n- Toilettenpapier\n$/);
+});
+
+test("editor overview: − and + change a task's interval", async () => {
+  const { card, $, save } = await editor();
+  $('[data-act="mode"][data-mode="overview"]').click();
+  await tick();
+  const row = () => [...root(card).querySelectorAll(".ov tbody tr")].find((r) => /Kühlschrank/.test(r.textContent));
+  const dots = () => [...row().querySelectorAll("td")].map((td) => (td.querySelector(".dot") ? "●" : "·")).join("");
+  assert.match(row().querySelector(".freq").textContent, /^alle 2\. Mal, ab 2\.$/);
+  assert.equal(dots(), "·●·●·●·●");
+
+  row().querySelector('[data-act="f-ov-every"][data-delta="1"]').click();
+  assert.match(row().querySelector(".freq").textContent, /^alle 3\. Mal, ab 2\.$/);
+  assert.equal(dots(), "·●··●··●", "start visit 2 is kept");
+  assert.match($(".ov-info").textContent, /alle 3 Besuche/, "cycle follows");
+
+  // Down to every time: the row stays in the table while editing, − is disabled
+  row().querySelector('[data-act="f-ov-every"][data-delta="-1"]').click();
+  row().querySelector('[data-act="f-ov-every"][data-delta="-1"]').click();
+  assert.match(row().querySelector(".freq").textContent, /^jedes Mal, ab 2\.$/);
+  assert.equal(row().querySelector('[data-act="f-ov-every"][data-delta="-1"]').disabled, true);
+  assert.equal(dots(), "·●●●●●●●");
+
+  row().querySelector('[data-act="f-ov-every"][data-delta="1"]').click();
+  row().querySelector('[data-act="f-ov-every"][data-delta="1"]').click();
+  row().querySelector('[data-act="f-ov-every"][data-delta="1"]').click(); // every 4, from 2
+  const call = await save();
+  assert.match(call.text, /\n- Kühlschrank \(alle 4\. Mal ab 2\)\n/);
+});
+
+test("household overview has no interval buttons", async () => {
+  const { $ } = await household();
+  $('[data-act="overview"]').click();
+  assert.equal($('[data-act="f-ov-every"]'), null);
+});
+
+/* ---------- fold state ---------- */
+
+test("the list opens fully folded; the fold state is saved per plan in localStorage", async () => {
+  const url = "https://ha.local/lovelace/0";
+  const mount = async (env) => {
+    const { window, card, hass, subs } = env;
+    card.setConfig({ entry_id: "e1" });
+    window.document.body.appendChild(card);
+    card.hass = hass;
+    await tick();
+    subs[0].cb(FLOORS);
+    return {
+      $$: (sel) => [...card.shadowRoot.querySelectorAll(sel)],
+      $: (sel) => card.shadowRoot.querySelector(sel),
+    };
+  };
+
+  const first = setup("de", url);
+  let ui = await mount(first);
+  assert.ok(ui.$$(".floor").every((f) => f.classList.contains("folded")));
+  assert.equal(ui.$$(".task").length, 0, "nothing is open");
+  assert.equal(ui.$('[data-act="fold-all"]').textContent, "Alle ausklappen");
+
+  ui.$$(".floor-head")[0].click(); // Erdgeschoss
+  ui.$$(".floor")[0].querySelector('[data-act="fold"]').click(); // Küche
+  const stored = JSON.parse(first.window.localStorage.getItem("cleaning-plan-card.open.e1"));
+  assert.deepEqual(Object.keys(stored).sort(), ['["F","Erdgeschoss"]', '["L","Erdgeschoss","Küche"]']);
+
+  // A reload in the same browser restores it: same localStorage, new card
+  const card2 = first.window.document.createElement("cleaning-plan-visit-card");
+  first.card.remove();
+  const second = { ...first, card: card2, subs: [] };
+  second.hass = { ...first.hass, connection: { subscribeMessage: async (cb) => (second.subs.push({ cb }), async () => {}) } };
+  ui = await mount(second);
+  assert.ok(!ui.$$(".floor")[0].classList.contains("folded"), "Erdgeschoss is still open");
+  assert.deepEqual(ui.$$(".task").map((b) => b.dataset.task), ["Spüle"], "Küche is still open");
+  assert.equal(ui.$('[data-act="fold-all"]').textContent, "Alle einklappen");
+
+  // Collapse all folds floors too and is saved as well
+  ui.$('[data-act="fold-all"]').click();
+  assert.ok(ui.$$(".floor").every((f) => f.classList.contains("folded")));
+  assert.deepEqual(JSON.parse(first.window.localStorage.getItem("cleaning-plan-card.open.e1")), {});
+});
+
+test("without localStorage the fold state still works in memory", async () => {
+  const { $, $$ } = await household(FLOORS); // jsdom without a URL has no localStorage
+  $$(".floor-head")[0].click();
+  assert.ok(!$$(".floor")[0].classList.contains("folded"));
+  $('[data-act="fold-all"]').click();
+  assert.ok($$(".floor")[0].classList.contains("folded"));
 });

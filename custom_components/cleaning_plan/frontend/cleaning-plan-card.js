@@ -19,7 +19,7 @@
  *   - Text: the raw plan text, validated on the server while typing.
  */
 
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.9.0";
 const CARD_TYPE = "cleaning-plan-visit-card";
 const EDITOR_TYPE = "cleaning-plan-visit-card-editor";
 const WS = "cleaning_plan";
@@ -173,7 +173,9 @@ const STRINGS = {
     tabOverview: "Overview",
     back: "Back",
     ovIntro: "Tasks that are not due on every visit. Use this to spread heavy jobs evenly.",
-    ovEditHint: "Tap an empty cell to move that task's turn to this visit.",
+    ovEditHint: "Tap an empty cell to move that task's turn to this visit; − and + change how often it is due.",
+    ovMoreOften: "More often",
+    ovLessOften: "Less often",
     ovNone: "Every task is due on every visit. Set a task to \"every 2. visit\" or more to plan it here.",
     ovVisit: "Visit",
     ovExtra: "Extra tasks",
@@ -309,7 +311,9 @@ const STRINGS = {
     tabOverview: "Übersicht",
     back: "Zurück",
     ovIntro: "Aufgaben, die nicht bei jedem Besuch fällig sind. So lassen sich große Arbeiten gleichmäßig verteilen.",
-    ovEditHint: "Auf ein leeres Feld tippen, um die Aufgabe auf diesen Besuch zu verschieben.",
+    ovEditHint: "Auf ein leeres Feld tippen verschiebt die Aufgabe auf diesen Besuch; − und + ändern, wie oft sie fällig ist.",
+    ovMoreOften: "Öfter",
+    ovLessOften: "Seltener",
     ovNone: "Alle Aufgaben sind bei jedem Besuch fällig. Eine Aufgabe auf „alle 2. Mal“ oder mehr stellen, um sie hier zu planen.",
     ovVisit: "Besuch",
     ovExtra: "Zusätzliche Aufgaben",
@@ -365,7 +369,7 @@ const isoOf = (n) => numToDate(n).toISOString().slice(0, 10);
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const freqLabel = (task, t) => {
-  if (task.every === 1) return t.freqEvery;
+  if (task.every === 1) return task.from > 1 ? t.freqEvery + t.freqFrom(task.from) : t.freqEvery;
   const base = t.freqN(task.every);
   return task.from > 1 ? base + t.freqFrom(task.from) : base;
 };
@@ -581,7 +585,7 @@ const overviewCount = (locations) => Math.min(16, Math.max(8, cycleLength(locati
  * Returns the visits shown, their dates, the irregular tasks grouped by floor and location
  * with a due flag per visit, and per visit the count of irregular ("extra") and all tasks.
  */
-function buildOverview(plan, firstVisit, count) {
+function buildOverview(plan, firstVisit, count, keep = () => false) {
   const visits = Array.from({ length: count }, (_, i) => firstVisit + i);
   const extra = visits.map(() => 0);
   const total = visits.map(() => 0);
@@ -591,8 +595,8 @@ function buildOverview(plan, firstVisit, count) {
     for (const task of loc.tasks) {
       const due = visits.map((v) => isDue(task, v));
       due.forEach((d, i) => d && total[i]++);
-      if (!isIrregular(task)) continue;
-      due.forEach((d, i) => d && extra[i]++);
+      if (isIrregular(task)) due.forEach((d, i) => d && extra[i]++);
+      else if (!keep(task)) continue;
       rows.push({ task, due });
     }
     if (rows.length) groups.push({ floor: loc.floor || "", name: loc.name, rows });
@@ -614,10 +618,11 @@ class CleaningPlanVisitCard extends HTMLElement {
       this._busy = new Set(); // keys of ticks being saved
       this._data = null;
       this._error = null;
-      this._fold = {}; // "visit-iso|location" -> true (folded) / false (open); unset = folded
-      this._wasDone = {}; // "visit-iso|location" -> was fully done at the last render
+      // Open floors and rooms of the tick-off list; everything else is folded.
+      // Saved per plan in this browser's localStorage, see _loadOpen.
+      this._open = {};
+      this._wasDone = {}; // "visit-iso" + key -> was fully done at the last render
       this._visibleLocs = [];
-      this._floorFold = {}; // "visit-iso|F|floor" -> true when folded; floors start open
       this._visibleFloors = [];
       this._view = "list"; // "list" | "overview"
       this._ovShift = 0; // overview window, in pages of visits
@@ -712,6 +717,7 @@ class CleaningPlanVisitCard extends HTMLElement {
         entryId = plans[0].entry_id;
       }
       this._entryId = entryId;
+      this._loadOpen();
       const unsub = await this._hass.connection.subscribeMessage((msg) => this._onData(token, msg), {
         type: `${WS}/subscribe`,
         entry_id: entryId,
@@ -1077,7 +1083,12 @@ class CleaningPlanVisitCard extends HTMLElement {
       if (n && !window.confirm(this._t.confirmDeleteLoc(loc.name.trim(), n))) return;
       this._floor(fi).locations.splice(li, 1);
     } else if (act === "f-task-del") this._loc(fi, li).tasks.splice(ti, 1);
-    else if (act === "f-ov-set") {
+    else if (act === "f-ov-every") {
+      // Overview: change the interval; the start visit stays, so the next turn is kept where possible
+      const task = this._loc(fi, li).tasks[ti];
+      task.every = Math.min(99, Math.max(1, task.every + Number(el.dataset.delta)));
+      (ed.ovPinned ||= new Set()).add(task.id);
+    } else if (act === "f-ov-set") {
       // Overview: move the task's turn so it is due on visit v (same interval)
       const task = this._loc(fi, li).tasks[ti];
       task.from = ((Number(el.dataset.v) - 1) % task.every) + 1;
@@ -1110,15 +1121,14 @@ class CleaningPlanVisitCard extends HTMLElement {
     else if (act === "example") this._insertExample();
     else if (act === "save") this._savePlan();
     else if (act === "fold") {
-      this._fold[el.dataset.loc] = el.dataset.folded !== "1";
+      this._setOpen(el.dataset.loc, el.dataset.folded === "1");
       this._render();
     } else if (act === "fold-all") {
-      const to = el.dataset.to === "1";
-      this._visibleLocs.forEach((k) => (this._fold[k] = to));
-      if (!to) this._visibleFloors.forEach((k) => (this._floorFold[k] = false));
+      const open = el.dataset.to !== "1"; // data-to="1" means collapse
+      [...this._visibleFloors, ...this._visibleLocs].forEach((k) => this._setOpen(k, open));
       this._render();
     } else if (act === "ffold") {
-      this._floorFold[el.dataset.key] = !this._floorFold[el.dataset.key];
+      this._setOpen(el.dataset.key, !this._isOpen(el.dataset.key));
       this._render();
     } else if (act === "supply") this._toggleSupply(el);
     else if (act === "flag") this._openProblem(el);
@@ -1126,6 +1136,35 @@ class CleaningPlanVisitCard extends HTMLElement {
     else if (act === "p-cancel") ((this._pedit = null), this._render());
     else if (act === "p-send") this._sendProblem();
     else if (act === "p-withdraw" || act === "p-resolve") this._resolveProblem(el.dataset.id);
+  }
+
+  /* ----- fold state of the tick-off list, kept per plan in localStorage ----- */
+
+  get _openStorageKey() {
+    return `cleaning-plan-card.open.${this._entryId}`;
+  }
+
+  _loadOpen() {
+    try {
+      this._open = JSON.parse(window.localStorage.getItem(this._openStorageKey)) || {};
+    } catch (e) {
+      this._open = {}; // no storage (private mode, embedded views): fold state lives in memory
+    }
+  }
+
+  _isOpen(key) {
+    return this._open[key] === true;
+  }
+
+  _setOpen(key, open) {
+    if (open === this._isOpen(key)) return;
+    if (open) this._open[key] = true;
+    else delete this._open[key];
+    try {
+      window.localStorage.setItem(this._openStorageKey, JSON.stringify(this._open));
+    } catch (e) {
+      /* keep it in memory */
+    }
   }
 
   /* ----- rendering ----- */
@@ -1251,22 +1290,24 @@ class CleaningPlanVisitCard extends HTMLElement {
         floor,
         name: loc.name.trim(),
         tasks: loc.tasks
-          .map((k, ti) => ({ name: k.name.trim(), every: k.every, from: k.from, ref: { fi, li, ti } }))
+          .map((k, ti) => ({ name: k.name.trim(), every: k.every, from: k.from, ref: { fi, li, ti, id: k.id } }))
           .filter((k) => k.name && ok(k.every) && ok(k.from)),
       })),
     };
     const today = isoToNum((this._data && this._data.today) || isoOf(Math.floor(Date.now() / 86400000)));
     const diff = today - plan.start;
     const current = diff <= 0 ? 1 : Math.ceil(diff / plan.rhythm) + 1;
-    return this._overviewHTML(plan, current, today, this._ed.ovShift || 0, true);
+    // Tasks whose interval was changed here stay in the table, even when set to "every time"
+    const pinned = this._ed.ovPinned || new Set();
+    return this._overviewHTML(plan, current, today, this._ed.ovShift || 0, true, (task) => pinned.has(task.ref.id));
   }
 
-  _overviewHTML(plan, current, today, shift, editable) {
+  _overviewHTML(plan, current, today, shift, editable, keep) {
     const t = this._t;
     const count = overviewCount(plan.locations);
     const cycle = cycleLength(plan.locations);
     const first = Math.max(1, current + shift * count);
-    const ov = buildOverview(plan, first, count);
+    const ov = buildOverview(plan, first, count, keep);
     if (!ov.groups.length) return `<div class="msg">${esc(t.ovNone)}</div>`;
 
     const doneSet = new Set();
@@ -1311,8 +1352,20 @@ class CleaningPlanVisitCard extends HTMLElement {
                 return `<td class="${colCls(i)}"></td>`;
               })
               .join("");
+            const freq = `<span class="freq">${esc(freqLabel(task, t))}</span>`;
+            const refs = task.ref ? `data-fi="${task.ref.fi}" data-li="${task.ref.li}" data-ti="${task.ref.ti}"` : "";
+            const stepper =
+              editable && task.ref
+                ? `<span class="ov-every">
+                    <button class="icon mini" data-act="f-ov-every" data-delta="-1" ${refs} ${task.every <= 1 ? "disabled" : ""}
+                            aria-label="${esc(`${task.name}: ${t.ovMoreOften}`)}" title="${esc(t.ovMoreOften)}">${MINUS}</button>
+                    ${freq}
+                    <button class="icon mini" data-act="f-ov-every" data-delta="1" ${refs} ${task.every >= 99 ? "disabled" : ""}
+                            aria-label="${esc(`${task.name}: ${t.ovLessOften}`)}" title="${esc(t.ovLessOften)}">${PLUS_S}</button>
+                  </span>`
+                : freq;
             return `<tr><th scope="row" class="ov-task">
-                <span class="ov-name">${esc(task.name)}</span><span class="freq">${esc(freqLabel(task, t))}</span>
+                <span class="ov-name">${esc(task.name)}</span>${stepper}
               </th>${cells}</tr>`;
           })
           .join("");
@@ -1547,7 +1600,6 @@ class CleaningPlanVisitCard extends HTMLElement {
 
     let total = 0;
     let ticked = 0;
-    let anyOpen = false;
     this._visibleLocs = [];
     this._visibleFloors = [];
     // floor -> { sections: [html], ticked, total }, in plan order
@@ -1556,19 +1608,20 @@ class CleaningPlanVisitCard extends HTMLElement {
       const due = loc.tasks.filter((k) => visit >= k.from && (visit - k.from) % k.every === 0);
       if (!due.length) continue;
       const floor = loc.floor || "";
-      const locKey = `${iso}|${floor}|${loc.name}`;
+      // Keys don't contain the visit, so the fold state carries over to the next visit
+      const locKey = JSON.stringify(["L", floor, loc.name]);
       this._visibleLocs.push(locKey);
       const keyed = due.map((task) => ({ task, isDone: done.has(`${floor}|${loc.name}|${task.name}`) }));
       const locTicked = keyed.filter((k) => k.isDone).length;
       total += keyed.length;
       ticked += locTicked;
       const locDone = locTicked === keyed.length;
-      // Locations start folded. When one becomes fully done, drop any manual
-      // "open" override so it folds again; a tap on the header reopens it.
-      if (locDone && !this._wasDone[locKey]) delete this._fold[locKey];
-      this._wasDone[locKey] = locDone;
-      const folded = locKey in this._fold ? this._fold[locKey] : true;
-      if (!folded) anyOpen = true;
+      // Rooms start folded. When one becomes fully done it folds again;
+      // a tap on the header reopens it.
+      const doneKey = iso + locKey;
+      if (locDone && !this._wasDone[doneKey]) this._setOpen(locKey, false);
+      this._wasDone[doneKey] = locDone;
+      const folded = !this._isOpen(locKey);
       const rows = folded
         ? ""
         : keyed
@@ -1614,13 +1667,13 @@ class CleaningPlanVisitCard extends HTMLElement {
         body += columns(group.sections.join(""));
         continue;
       }
-      // Floors start open and fold by themselves once all their tasks are done
-      const fKey = `${iso}|F|${floor}`;
+      // Floors start folded too, and fold by themselves once all their tasks are done
+      const fKey = JSON.stringify(["F", floor]);
       this._visibleFloors.push(fKey);
       const fDone = group.ticked === group.total;
-      if (fDone && !this._wasDone[fKey]) this._floorFold[fKey] = true;
-      this._wasDone[fKey] = fDone;
-      const folded = this._floorFold[fKey] === true;
+      if (fDone && !this._wasDone[iso + fKey]) this._setOpen(fKey, false);
+      this._wasDone[iso + fKey] = fDone;
+      const folded = !this._isOpen(fKey);
       body += `<div class="floor ${folded ? "folded" : ""} ${fDone ? "floor-done" : ""}">
           <button class="floor-head" data-act="ffold" data-key="${esc(fKey)}" aria-expanded="${!folded}">
             <span class="chev">${CHEV_D}</span>
@@ -1631,6 +1684,9 @@ class CleaningPlanVisitCard extends HTMLElement {
         </div>`;
     }
 
+    // Something is visibly open: a floor, or a room outside the floors
+    const noFloorLocs = this._visibleLocs.filter((k) => JSON.parse(k)[1] === "");
+    const anyOpen = [...this._visibleFloors, ...noFloorLocs].some((k) => this._isOpen(k));
     const date = formatDate(this._hass, vDay);
     const rel =
       vDay === today ? t.today : vDay === today + 1 ? t.tomorrow : vDay > today ? t.inDays(vDay - today) : t.daysAgo(today - vDay);
@@ -1657,7 +1713,7 @@ class CleaningPlanVisitCard extends HTMLElement {
       </div>
       <div class="count">
         ${
-          this._visibleLocs.length > 1
+          this._visibleLocs.length > 1 || this._visibleFloors.length
             ? `<button class="flat small" data-act="fold-all" data-to="${anyOpen ? 1 : 0}">${esc(anyOpen ? t.collapseAll : t.expandAll)}</button>`
             : "<span></span>"
         }
@@ -1850,6 +1906,8 @@ const DELETE = svg("M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM8 9h8v10H8zm7.5-5-1
 const FLAG = svg("M12.36 6l.4 2H18v6h-3.36l-.4-2H7V6h5.36M14 4H5v17h2v-7h5.6l.4 2h7V6h-5.6z", 20);
 const FLAG_ON = svg("M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z", 20);
 const ALERT = svg("M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2z", 16);
+const MINUS = svg("M19 13H5v-2h14z", 18);
+const PLUS_S = svg("M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z", 18);
 const PLUS = svg("M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z", 20);
 
 const STYLE = `
@@ -1966,6 +2024,9 @@ const STYLE = `
   .ov-task { font-weight: 400; color: var(--primary-text-color); }
   .ov-name { display: block; line-height: 1.25; }
   .ov-task .freq { display: inline-block; margin-top: 2px; }
+  .ov-every { display: inline-flex; align-items: center; gap: 2px; margin-top: 2px; }
+  .ov-every .freq { margin-top: 0; min-width: 7.5em; text-align: center; }
+  .icon.mini { width: 30px; height: 30px; }
   .ov-loc th { font-weight: 600; color: var(--primary-text-color); padding-top: 12px !important; height: auto;
                border-bottom: 1px solid var(--divider-color); }
   .ov-floor th { font-weight: 700; font-size: 0.95rem; color: var(--primary-text-color); padding-top: 16px !important;
