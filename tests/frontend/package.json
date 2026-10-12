@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "screenshots": "node screenshots.mjs"
+    "screenshots": "node screenshots.mjs",
+    "icon": "node render-icon.mjs"
   },
   "devDependencies": {
     "jsdom": "^26.0.0",

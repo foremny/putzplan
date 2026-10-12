@@ -1,5 +1,7 @@
 # Cleaning plan for Home Assistant
 
+<img src="custom_components/cleaning_plan/brand/icon.png" alt="" width="96" align="right">
+
 A custom integration for a cleaner who comes on a fixed rhythm, for example every 2 weeks. The household writes the plan in a dashboard card, in a form or as Markdown. On cleaning day the cleaner sees the tasks due on that visit, grouped by location, and ticks them off.
 
 The cleaner can report missing supplies and problems with a task. The integration stores the plan, the ticks and this feedback itself. It adds a calendar with one event per visit, sensors for the next visit and its progress, services for automations, and a Lovelace card that is loaded automatically.
@@ -250,6 +252,7 @@ uv sync                                   # Python 3.13+, HA test harness, repor
 uv run pytest                             # integration and parser tests
 cd tests/frontend && npm install && npm test   # card smoke tests in jsdom
 cd tests/frontend && npm run screenshots         # regenerate docs/screenshots with headless Chrome
+cd tests/frontend && npm run icon                # render docs/brand/icon.svg into the integration's brand/ PNGs
 ```
 
 | Path | Purpose |
@@ -258,6 +261,7 @@ cd tests/frontend && npm run screenshots         # regenerate docs/screenshots w
 | `custom_components/cleaning_plan/manager.py` | Storage, ticks, midnight rollover, change listeners |
 | `custom_components/cleaning_plan/websocket_api.py` | Commands used by the card |
 | `custom_components/cleaning_plan/frontend/cleaning-plan-card.js` | The card, vanilla JS, no build step |
+| `custom_components/cleaning_plan/brand/` | Integration icon, served by Home Assistant itself. Source: `docs/brand/icon.svg` |
 | `putzplan.txt` | The household plan, ready to paste into the Text tab |
 
 Notes for changes:

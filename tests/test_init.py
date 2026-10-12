@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -561,3 +562,18 @@ async def test_problems_follow_renames_and_expire(
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert manager.snapshot("x")["problems"] == []
+
+
+async def test_brand_icon_is_served(hass: HomeAssistant, hass_client: Any) -> None:
+    """Home Assistant serves the integration's own icon, and falls back to it for the logo."""
+    from homeassistant.setup import async_setup_component
+
+    assert await async_setup_component(hass, "brands", {})
+    client = await hass_client()
+    icon = (Path(__file__).parents[1] / "custom_components/cleaning_plan/brand/icon.png").read_bytes()
+    for image in ("icon.png", "logo.png", "dark_icon.png"):
+        response = await client.get(f"/api/brands/integration/cleaning_plan/{image}")
+        assert response.status == 200, image
+        assert await response.read() == icon, image
+    response = await client.get("/api/brands/integration/cleaning_plan/icon@2x.png")
+    assert response.status == 200

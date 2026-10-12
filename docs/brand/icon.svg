@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Cleaning plan: a clipboard with a checklist and a sparkle -->
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#29b6f6"/>
+      <stop offset="1" stop-color="#0288d1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- clipboard -->
+  <rect x="28" y="34" width="168" height="214" rx="26" fill="url(#board)"/>
+  <rect x="48" y="62" width="128" height="166" rx="12" fill="#ffffff"/>
+  <!-- clip -->
+  <rect x="74" y="16" width="76" height="40" rx="14" fill="#01579b"/>
+  <circle cx="112" cy="30" r="7" fill="#29b6f6"/>
+
+  <!-- checklist: two ticked rows, one open -->
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M64 100 l10 10 l20 -22" stroke="#43a047" stroke-width="10"/>
+    <path d="M64 150 l10 10 l20 -22" stroke="#43a047" stroke-width="10"/>
+    <rect x="64" y="184" width="26" height="26" rx="6" stroke="#90a4ae" stroke-width="7"/>
+  </g>
+  <g fill="#b0bec5">
+    <rect x="106" y="94" width="56" height="12" rx="6"/>
+    <rect x="106" y="144" width="56" height="12" rx="6"/>
+    <rect x="106" y="191" width="56" height="12" rx="6"/>
+  </g>
+
+  <!-- sparkles -->
+  <path d="M214 24 C218 50 226 58 252 62 C226 66 218 74 214 100 C210 74 202 66 176 62 C202 58 210 50 214 24 Z" fill="#ffc107"/>
+  <path d="M236 112 C238 124 242 128 254 130 C242 132 238 136 236 148 C234 136 230 132 218 130 C230 128 234 124 236 112 Z" fill="#ffca28"/>
+</svg>
